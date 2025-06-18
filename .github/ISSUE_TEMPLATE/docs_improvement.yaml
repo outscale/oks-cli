@@ -1,0 +1,78 @@
+name: 📝 Documentation Improvement
+description: Suggest changes or improvements to the documentation.
+title: "[DOCS] Clear and concise title"
+labels: [kind/docs]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping us improve our documentation! Please provide as much detail as possible so we can understand and address the issue or suggestion.
+
+  - type: textarea
+    id: what-section
+    attributes:
+      label: What section or page needs improvement?
+      description: Mention the specific command, page, or section in the documentation you're referring to.
+      placeholder: |
+        For example: The page describing `oks-cli create cluster`
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-is-wrong
+    attributes:
+      label: What is unclear or incorrect?
+      description: Clearly describe the problem or the information that is missing, outdated, or confusing.
+      placeholder: |
+        I noticed that the `--dry-run` flag is undocumented...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What would you like to see instead?
+      description: Suggest how we could improve the documentation or make it more clear.
+      placeholder: |
+        I suggest adding an example for...
+    validations:
+      required: false
+
+  - type: input
+    id: docs-version
+    attributes:
+      label: Version or link (if applicable)
+      description: If this is about a specific version of OKS-CLI or a URL to the docs, mention it here.
+      placeholder: "https://docs.outscale.com/fr/userguide/Installer-et-configurer-OKS-CLI.html" 
+    validations:
+      required: false
+
+  - type: dropdown
+    id: docs-type
+    attributes:
+      label: Type of documentation
+      description: What type of documentation is this about?
+      options:
+        - CLI command help (`oks-cli --help`)
+        - Official docs site
+        - README or GitHub file
+        - Other
+    validations:
+      required: true
+  
+  - type: textarea
+    id: docs-type-other
+    attributes:
+      label: If you selected "Other", please describe
+      description: Provide details about the documentation type if not covered above.
+      placeholder: "Please specify..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else?
+      description: Include any other details, context, screenshots, or suggestions that could help.

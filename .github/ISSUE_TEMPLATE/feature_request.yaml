@@ -1,0 +1,53 @@
+name: ✨ Feature Request
+description: Suggest a new feature or improvement.
+title: "[FEATURE] Clear and concise title"
+labels: [kind/feature]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature! Please fill out the following information to help us understand and prioritize your request.
+
+  - type: textarea
+    id: feature-summary
+    attributes:
+      label: What feature do you want to see?
+      description: Clearly describe the feature or capability you're proposing.
+      placeholder: "I would like OKS-CLI to support..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What is the use case or problem this feature solves?
+      description: Explain why this feature is needed. Describe the problem it solves or the scenario it improves.
+      placeholder: "When using OKS-CLI, I often run into..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the proposed solution
+      description: How do you imagine the feature should work? Include any ideas about implementation.
+      placeholder: "The command could be added like this..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Have you considered any alternatives?
+      description: List other solutions you've considered or workarounds you’ve used.
+      placeholder: "I tried doing this with..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else?
+      description: Include any other context, mockups, or suggestions that may help.

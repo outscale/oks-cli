@@ -125,4 +125,4 @@ BSD-3-Clause
 
 - [OKS-CLI Documentation](https://docs.outscale.com/fr/userguide/Installer-et-configurer-OKS-CLI.html)
 - [OKS-API Documentation](https://docs.outscale.com/oks.html)
-- [Link to GitHub issues]()
+- [Link to GitHub issues](https://github.com/outscale/oks-cli/issues)
