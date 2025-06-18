@@ -1,0 +1,78 @@
+name: 🐛 Bug Report
+description: Report unexpected behavior or a problem.
+title: "[BUG] Clear and concise title"
+labels: [kind/bug]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug. Please fill out as much information as possible to help us reproduce and fix the issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Clearly describe what happened. Include any error messages or logs if applicable.
+      placeholder: "Describe what you observed."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What did you expect to happen?
+      description: Describe what you expected to happen instead.
+      placeholder: "Explain what you thought the application would do."
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it (as minimally and precisely as possible)?
+      description: Please provide a step-by-step guide to reproduce the issue.
+      placeholder: |
+        1. oks-cli...
+        2. Then...
+        3. See the error...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What version of the OKS-CLI are you using?
+      placeholder: "oks-cli version 1.13"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste any relevant logs here (automatically formatted).
+      render: shell
+      placeholder: |
+        Paste your logs here...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else we need to know?
+      description: Add any other context or information that might help.
