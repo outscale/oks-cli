@@ -11,26 +11,23 @@ OKS-CLI is an interface that allows you to deploy your Kubernetes cluster on top
 
 ### Standard Installation (Recommended)
 
-1. **Create a virtual environment**
-   ```bash
-   python -m venv venv
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/outscale/oks-cli.git
+cd oks-cli
 
-2. **Activate the virtual environment**
-   ```bash
-   # On Linux/macOS
-   source venv/bin/activate
-   ```
+# Create a virtual environment
+python -m venv venv
 
-3. **Install the package**
-   ```bash
-   pip install -e .
-   ```
+# Activate your virtual environment
+source venv/bin/activate
 
-4. **Install autocompletion**
-   ```bash
-   oks-cli install-completion
-   ```
+# Install dependencies
+pip install -r requirements.txt
+
+# Install in editable mode
+pip install -e .
+```
 
 ### User Installation (Python 3.11)
 

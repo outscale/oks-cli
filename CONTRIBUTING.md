@@ -17,8 +17,6 @@ There are several ways to contribute to this project:
 
 - **Report bugs** - Help us identify and fix issues
 - **Suggest new features** - Propose improvements and new functionality
-- **Fix existing bugs** - Resolve reported issues
-- **Implement new features** - Turn approved ideas into working code
 - **Improve the documentation** - Make our guides clearer and more helpful
 
 ## Report bugs
@@ -27,37 +25,27 @@ Before reporting a bug, check that it has not already been reported by consultin
 
 ### How to report a bug
 
+Suggestions for improvements are welcome! Before reporting a bug :
+
+1. Check if the Bug has already been reported
 1. Use the "Bug Report" issue template
 2. Provide a clear and concise description of the problem
 3. Include steps to reproduce the bug
-4. Specify your environment (OS, software version, etc.)
-5. Add screenshots if relevant
-
-### Information to include
-
-- **Summary**: Short description of the problem
-- **Reproduction Steps**: List of actions
-- **Expected Behavior**: What should happen
-- **Current Behavior**: What is actually happening
-- **Environment**: Technical details of your configuration
+4. Describe the actual behavior
+5. Describe the expected behavior
+6. Specify your environment (OS, oks-cli version, terminal, etc.)
+7. Attach any relevant logs, screenshots, or error messages
 
 ## Suggest features
 
-Suggestions for improvements are welcome! Before proposing a feature:
+Suggestions for improvements are welcome! Before proposing a feature :
 
-1. Check if the feature already exists
-2. Review existing issues to avoid duplication
-3. Choose the right issue template based on your intent :
-  - **Suggest a New Feature** : Use this template if you have an idea for a feature but do not plan to implement it yourself. This helps the community discuss and evaluate it.
-  - **Implement a New Feature** : Use this template if you have both a feature idea and plan to submit a pull request to implement it. This allows better coordination and avoids duplicated efforts.
-
-### Proposal process
-
-1. Open an issue using the "Feature Request" template
-2. Clearly describe the problem your proposal solves
-3. Explain your proposed solution
-4. Mention the alternatives considered
-5. Wait for feedback from the team
+1. Check if the Feture has already been reported
+2. Use the "Feature Request" issue template
+3. Clearly describe the problem your proposal solves
+4. Explain your proposed solution
+5. Mention any alternatives you considered
+6. Wait for feedback from the team — or, if you're ready, implement the feature yourself by opening a pull request
 
 ## Development
 
@@ -120,7 +108,7 @@ oks-cli/
 
 ### Acceptance criteria
 
-- The code complies with the project's coding standards
+- The code follows the project's Python conventions and CLI architecture
 - Documentation is updated as needed
 - Commits are well formatted
 - No merge conflicts
@@ -140,7 +128,7 @@ Use the provided template and include:
 ### Code style
 
 - Follow project naming conventions
-- Use configured linting tools (Black, PEP8, etc.)
+- Use configured linting tools (PEP8)
 - Respect existing indentation and formatting
 - Comment out complex code
 
@@ -149,14 +137,10 @@ Use the provided template and include:
 Use the conventional format :
 
 ```
-type(scope): short description
-
-More detailed message body if needed.
-
-Fix #123
+git commit -m "feat: brief description of your functionality"
 ```
 
-Accepted types : `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+Accepted types : `feat`, `fix`, `docs`, `style`, `refactor`, `test`
 
 ### Documentation
 
@@ -164,18 +148,18 @@ Accepted types : `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 - Use **docstrings** for public functions and classes
 - Keep README.md up to date
 
-## Processus de review
+## Review process
 
 1. **Manual testing** : The CLI should be tested locally. Verify that the commands work and do not generate errors.
-2. **Review by a member of our team** : At least one person must approve the PR. The code must be readable and consistent.
+2. **Review by someone from our team** :  A member of our team will review the PR to ensure the code is clear and consistent.
 3. **Merge** : A maintainer merges the PR after validation.
 
 ## Questions ?
 
 If you have questions not covered in this guide :
 
-- Consult [existing issues](../../issues)
-- Open a new issue labeled "question"
+- Consult [existing issues](https://github.com/outscale/oks-cli/issues)
+- Contact [support](https://docs.outscale.com/fr/userguide/Support-technique.html)
 
 ## Thanks
 

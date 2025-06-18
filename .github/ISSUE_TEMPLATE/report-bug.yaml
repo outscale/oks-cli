@@ -86,5 +86,5 @@ body:
   - type: textarea
     id: additional
     attributes:
-      label: Anything else we need to know?
+      label: Anything else ?
       description: Add any other context or information that might help.
