@@ -184,7 +184,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 ## 📜 License
 
 **BSD-3-Clause**
-© 2024 Outscale SAS
+© Outscale SAS
 
 ---
 
