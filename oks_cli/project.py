@@ -20,7 +20,7 @@ def project(ctx, project_name, profile):
 
 # LOGIN ON PROJECT
 @project.command('login', help="Set a default project by name")
-@click.option('--project-name', '-p', required=True, help="Name of project", type=click.STRING)
+@click.option('--project-name', '-p', required=False, help="Name of project", type=click.STRING)
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def project_login(ctx, project_name, profile):

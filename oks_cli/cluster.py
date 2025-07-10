@@ -31,7 +31,7 @@ def cluster(ctx, project_name, cluster_name, profile):
 
 # LOGIN ON CLUSTER
 @cluster.command('login', help="Set a default cluster")
-@click.option('--cluster-name', '-c', required=True, help="Name of cluster")
+@click.option('--cluster-name', '-c', required=False, help="Name of cluster")
 @click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_login(ctx, cluster_name, profile):
@@ -312,8 +312,7 @@ def _create_cluster(project_name, cluster_config, output):
 # CLUSTER CREATE BY NAME
 @cluster.command('create', help="Create a new cluster")
 @click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--cluster-name', '-c', required=True, help="Cluster Name")
-@click.option('--name', 'cluster_name', required=True, help="Cluster Name")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
 @click.option('--description', help="Description of the cluster")
 @click.option('--admin', help="Admin Whitelist")
 @click.option('--version', shell_complete=shell_completions, help="Kubernetes version")
@@ -341,6 +340,9 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
     if filename:
         input_data = filename.read()
         cluster_config = detect_and_parse_input(input_data)
+
+    if not cluster_name and "name" not in cluster_config:
+        raise click.BadArgumentUsage("Missing option '--cluster-name' / '-c'.")
 
     if cluster_name:
         cluster_config['name'] = cluster_name
@@ -646,7 +648,7 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
 
     env = dict(os.environ)
-    env['KUBECONFIG'] = kubeconfig_path
+    env['KUBECONFIG'] = str(kubeconfig_path)
     cmd = ['kubectl']
     cmd += list(args)
     logging.info("running %s", cmd)

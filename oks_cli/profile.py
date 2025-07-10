@@ -1,5 +1,5 @@
 import click
-from .utils import set_profile, remove_profile, profile_list, DEFAULT_API_URL
+from .utils import set_profile, remove_profile, profile_list, DEFAULT_API_URL, get_profiles
 
 
 # DEFINE THE PROFILE COMMAND GROUP
@@ -22,6 +22,16 @@ def add_profile(profile_name, access_key, secret_key, username, password, region
     """Add a new profile with AK/SK or username/password authentication."""
     if not profile_name:
         profile_name = "default"
+
+    existing_profiles = get_profiles()
+    if profile_name in existing_profiles:
+        confirm = click.confirm(
+            f"The profile '{profile_name}' already exists. Do you want to replace it?",
+            default=False
+        )
+        if not confirm:
+            click.echo("Aborted.")
+            return
 
     obj = {
         "region_name": region
@@ -47,9 +57,8 @@ def add_profile(profile_name, access_key, secret_key, username, password, region
 
     set_profile(profile_name, obj)
 
-    profile_name = click.style(profile_name, bold=True)
-
-    click.echo(f"Profile {profile_name} has been successfully added")
+    profile_name_styled = click.style(profile_name, bold=True)
+    click.echo(f"Profile {profile_name_styled} has been successfully added")
 
 @profile.command('update', help="Update an existing profile")
 @click.option('--profile-name', required=True, help="Name of profile", type=click.STRING)

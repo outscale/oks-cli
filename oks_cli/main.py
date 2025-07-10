@@ -79,7 +79,7 @@ def fullhelp():
 def version():
     """Display the current CLI version."""
     import importlib.metadata
-    print(importlib.metadata.version(__package__) + ".KAAS-1014")
+    print(importlib.metadata.version(__package__))
 
 @cli.command("install-completion", help="Install shell completion scripts.")
 @click.option('--type', help="Shell")

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="oks-cli",
-    version="1.13",
+    version="1.14",
     packages=['oks_cli'],
     author="Outscale SAS",
     author_email="mgrechukh@satelliz.com",
