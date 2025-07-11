@@ -38,5 +38,10 @@ setup(
         "altgraph>=0.17.4",
         "pynacl>=1.5.0",
         "pyOpenSSL>=25.0.0"
-    ]
+    ],
+    extras_require={
+        'dev': [
+            'pytest>=8.4.1',
+        ],
+    }
 )
