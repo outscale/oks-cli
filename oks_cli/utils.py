@@ -20,8 +20,14 @@ import sys
 
 from click.shell_completion import CompletionItem
 
-CONFIG_FOLDER = os.path.expanduser('~/.oks_cli')
-PROFILE_FILE = f"{CONFIG_FOLDER}/config.json"
+
+def get_config_path():
+    CONFIG_FOLDER = os.path.expanduser('~/.oks_cli')
+    if not os.path.exists(CONFIG_FOLDER):
+        os.makedirs(CONFIG_FOLDER)
+
+    PROFILE_FILE = f"{CONFIG_FOLDER}/config.json"
+    return CONFIG_FOLDER, PROFILE_FILE
 
 DEFAULT_API_URL = "https://api.{region}.oks.outscale.com/api/v2/"
 
@@ -29,8 +35,6 @@ class JSONClickException(click.ClickException):
     def show(self, file=None):
         click.echo(self.message, file=file)
 
-if not os.path.exists(CONFIG_FOLDER):
-    os.makedirs(CONFIG_FOLDER)
 
 def find_response_object(data):
     """Extract the main object from the API response payload."""
@@ -216,6 +220,8 @@ def get_project_id():
 
     if not os.getenv("OKS_PROFILE"):
         return
+    
+    CONFIG_FOLDER, _ = get_config_path()
 
     PROJECT_ID_FILE = f"{CONFIG_FOLDER}/{os.getenv('OKS_PROFILE')}.project_id"
 
@@ -231,6 +237,8 @@ def get_cluster_id():
 
     if not os.getenv("OKS_PROFILE"):
         return
+    
+    CONFIG_FOLDER, _ = get_config_path()
 
     CLUSTER_ID_FILE = f"{CONFIG_FOLDER}/{os.getenv('OKS_PROFILE')}.cluster_id"
 
@@ -242,6 +250,8 @@ def get_cluster_id():
 
 def set_cluster_id(cluster_id):
     """Save the given cluster ID to the profile configuration file with secure permissions."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     if not os.path.exists(CONFIG_FOLDER):
         os.makedirs(CONFIG_FOLDER)
 
@@ -257,6 +267,8 @@ def set_cluster_id(cluster_id):
 
 def set_project_id(project_id):
     """Save the given project ID to the profile configuration file with secure permissions."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     if not os.path.exists(CONFIG_FOLDER):
         os.makedirs(CONFIG_FOLDER)
 
@@ -275,6 +287,7 @@ def login_profile(name):
     Load and set environment variables for the given profile name.
     Raises an exception if the profile does not exist or lacks required info.
     """
+    _, PROFILE_FILE = get_config_path()
     if name is None:
         name = "default"
 
@@ -311,6 +324,8 @@ def login_profile(name):
 
 def profile_list():
     """Return all profiles as a dict, or empty if none."""
+    _, PROFILE_FILE = get_config_path()
+
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, 'r') as file:
             profiles = json.load(file)
@@ -320,6 +335,8 @@ def profile_list():
 
 def get_profiles():
     """Return list of profile names, or empty list."""
+    _, PROFILE_FILE = get_config_path()
+
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, 'r') as f:
             data = json.load(f)
@@ -334,6 +351,8 @@ def profile_completer(ctx, param, incomplete):
 
 def set_profile(name, obj: dict):
     """Add or update a profile in the profiles file."""
+    _, PROFILE_FILE = get_config_path()
+
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, 'r+') as file:
             profiles = json.load(file)
@@ -356,6 +375,8 @@ def set_profile(name, obj: dict):
 
 def remove_profile(name):
     """Remove a profile by name from the profiles file."""
+    _, PROFILE_FILE = get_config_path()
+
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, 'r+') as file:
             profiles = json.load(file)
@@ -369,6 +390,8 @@ def remove_profile(name):
 
 def get_cache(project, cluster, name, user, group):
     """Return path to cached item if it exists, else None."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     user = user or "default"
     group = group or "default"
 
@@ -384,6 +407,8 @@ def get_cache(project, cluster, name, user, group):
 
 def save_cache(project, cluster, name, data, user, group):
     """Save data to cache file and return its path."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     user = user or "default"
     group = group or "default"
 
@@ -403,11 +428,13 @@ def save_cache(project, cluster, name, data, user, group):
 
 def clear_cache():
     """Delete the entire cache directory."""
+    CONFIG_FOLDER, _ = get_config_path()
     cache = pathlib.Path(CONFIG_FOLDER).joinpath("cache")
     shutil.rmtree(cache)
 
 def get_all_cache(project, cluster, name):
     """Retrieve all cache entries for a project and cluster."""
+    CONFIG_FOLDER, _ = get_config_path()
     cluster_cache_path = pathlib.Path(CONFIG_FOLDER).joinpath("cache", f"{project}-{cluster}")
     table = []
 
@@ -438,6 +465,7 @@ def parse_jwt(token):
 
 def save_tokens(headers):
     """Save access and refresh tokens from response headers."""
+    CONFIG_FOLDER, _ = get_config_path()
     if not headers.get('Access-Token') or not headers['Refresh-Token']:
         return
 
@@ -458,6 +486,7 @@ def save_tokens(headers):
 
 def is_tokens_valid():
     """Check if stored refresh token is still valid."""
+    CONFIG_FOLDER, _ = get_config_path()
     if not os.getenv("OKS_PROFILE"):
         return
 
@@ -482,6 +511,8 @@ def is_tokens_valid():
 
 def is_jwt_enabled():
     """Return True if JWT is enabled in the current profile."""
+    _, PROFILE_FILE = get_config_path()
+
     if not os.getenv("OKS_PROFILE"):
         return
 
@@ -500,6 +531,8 @@ def is_jwt_enabled():
 
 def get_token(token_type):
     """Retrieve stored token (access or refresh) for current profile."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     if not os.getenv("OKS_PROFILE"):
         return
 
@@ -514,6 +547,8 @@ def get_token(token_type):
 
 def remove_jwt_token(token_type):
     """Delete the specified JWT token file for current profile."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     if not os.getenv("OKS_PROFILE"):
         return
 
@@ -577,6 +612,8 @@ def retrieve_cp_sized(filepath, endpoint):
 
 def shell_completions(ctx, param: click.core.Option, incomplete):
     """Provide shell autocompletions with cached API data."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     profiles = profile_list()
     profile = ctx.params["profile"] or ctx.parent.params["profile"] or ctx.parent.parent.params["profile"] or "default"
 
@@ -721,6 +758,8 @@ def cluster_create_in_background(cluster_config, text):
 
 def get_template(type):
     """Fetch and cache template, refresh if older than 15 minutes."""
+    CONFIG_FOLDER, _ = get_config_path()
+
     TEMPLATE_PATH = f"{CONFIG_FOLDER}/cache/{type}.template"
     os.makedirs(f"{CONFIG_FOLDER}/cache", exist_ok=True)
 
