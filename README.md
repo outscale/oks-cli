@@ -50,6 +50,7 @@
 
 * Python 3.11 or later
 * `pip` (Python package manager)
+* `kubectl` (required for commands that interact with the Kubernetes API)
 
 ---
 
@@ -160,13 +161,21 @@ oks-cli project login --project-name my-project
 
 ### Editable Mode
 
-Install the CLI in development mode:
+Install the CLI in editable mode with development dependencies
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 Changes in the `oks_cli/` directory will be immediately reflected without reinstalling.
+
+### Tests
+
+Run the test suite using `pytest` to ensure code correctness and stability:
+
+```bash
+pytest
+```
 
 ### Project Structure
 
