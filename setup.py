@@ -5,7 +5,7 @@ setup(
     version="1.14",
     packages=['oks_cli'],
     author="Outscale SAS",
-    author_email="contact@outscale.com",
+    author_email="opensource@outscale.com",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     include_package_data=True,
