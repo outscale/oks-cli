@@ -325,12 +325,13 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--quirk', multiple=True, help="Quirk")
 @click.option('--tags', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
+@click.option('--cp-multi-az', is_flag=True, help="enable control plane multi az")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
 @click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('-f', '--filename', type=click.File("r"), help="Path to file to use to create the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, dry_run, output, filename, profile):
+def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, cp_multi_az, dry_run, output, filename, profile):
     """CLI command to create a new Kubernetes cluster with optional configuration parameters."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -397,6 +398,9 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 
     if disable_api_termination is not None:
         cluster_config["disable_api_termination"] = disable_api_termination
+    
+    if cp_multi_az is not None:
+        cluster_config["cp_multi_az"] = cp_multi_az
 
     if not dry_run:
         _create_cluster(project_name, cluster_config, output)
