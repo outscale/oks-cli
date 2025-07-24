@@ -59,30 +59,16 @@
 ### Standard Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/outscale/oks-cli.git
-cd oks-cli
-
 # Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the CLI
+pip install oks-cli
 
-# Install the CLI in editable mode
-pip install -e .
+# Check version of oks-cli
+oks-cli version
 ```
-
-### User Installation
-
-Install globally without a virtual environment (Python 3.11):
-
-```bash
-pip3.11 install -e --user .
-```
-
-> **Note:** Ensure `~/Library/Python/3.11/bin` (macOS) or the equivalent path is in your `PATH`.
 
 ---
 
@@ -164,6 +150,15 @@ oks-cli project login --project-name my-project
 Install the CLI in editable mode with development dependencies
 
 ```bash
+# Clone the repository
+git clone https://github.com/outscale/oks-cli.git
+cd oks-cli
+
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# CLI in editable mode
 pip install -e ".[dev]"
 ```
 
