@@ -715,7 +715,7 @@ def nodepool_list(ctx):
 @click.option('--nodepool-name', '-n', default="nodepool01", help="Nodepool Name")
 @click.option('--count', default=2, help="Count of nodes")
 @click.option('--type', 'vmtype', default="tinav6.c2r4p3", help="Type of VMs")
-@click.option('--zone', default=["eu-west-2a"], multiple=True, help="Provide zone")
+@click.option('--zone', multiple=True, help="Provide zone")
 @click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('-f', '--filename', type=click.File("r"), help="Path to file to use to create the Nodepool ")
