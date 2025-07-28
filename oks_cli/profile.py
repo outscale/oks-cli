@@ -134,7 +134,7 @@ def list_profiles(output):
         profiles[key].pop('password', None)
         # Add endpoint and JWT to dict
         profiles[key].update({'endpoint': endpoint})
-        profiles[key].update({'jwt_auth': profiles[key].get("jwt", False)})
+        profiles[key].update({'jwt': jwt})
 
         if output == 'wide':
             lines.append("Profile: {} Account type: {} Region: {} Endpoint: {} Enabled JWT auth: {}".format(
