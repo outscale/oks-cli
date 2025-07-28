@@ -1,5 +1,6 @@
 import click
-from .utils import set_profile, remove_profile, profile_list, DEFAULT_API_URL, get_profiles
+import prettytable
+from .utils import set_profile, remove_profile, profile_list, DEFAULT_API_URL, get_profiles, print_output
 
 
 # DEFINE THE PROFILE COMMAND GROUP
@@ -103,7 +104,8 @@ def delete_profile(profile_name, force):
         click.echo(f"Profile {profile_name_bold} has been successfully deleted")
 
 @profile.command('list', help="List existing profiles")
-def list_profiles():
+@click.option('-o', '--output', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
+def list_profiles(output):
     """Display all configured profiles with their settings."""
     profiles = profile_list()
 
@@ -111,18 +113,48 @@ def list_profiles():
         return click.echo("There are no profiles")
 
     profiles_keys = list(profiles.keys())
-
+    lines = list()
     for key in profiles_keys:
         if 'endpoint' not in profiles[key]:
             if 'region_name' in profiles[key]:
-                endpoint = click.style(DEFAULT_API_URL.format(region=profiles[key]['region_name']), bold=True)
+                endpoint = DEFAULT_API_URL.format(region=profiles[key]['region_name'])
             else:
                 endpoint = None
         else:
-            endpoint = click.style(profiles[key]["endpoint"], bold=True)
-        name = click.style(key, bold=True)
-        account_type = click.style(profiles[key]["type"], bold=True)
-        region = click.style(profiles[key]["region_name"], bold=True)
-        jwt = click.style(profiles[key].get("jwt", False), bold=True)
+            endpoint = profiles[key]["endpoint"]
 
-        click.echo(f"Profile: {name} Account type: {account_type} Region: {region} Endpoint: {endpoint} Enabled JWT auth: {jwt}")
+        name = key
+        account_type = profiles[key]["type"]
+        region = profiles[key]["region_name"]
+        jwt = profiles[key].get("jwt", False)
+        # Remove credentials keys from profiles
+        profiles[key].pop('access_key', None)
+        profiles[key].pop('secret_key', None)
+        profiles[key].pop('username', None)
+        profiles[key].pop('password', None)
+        # Add endpoint and JWT to dict
+        profiles[key].update({'endpoint': endpoint})
+        profiles[key].update({'jwt_auth': profiles[key].get("jwt", False)})
+
+        if output == 'wide':
+            lines.append("Profile: {} Account type: {} Region: {} Endpoint: {} Enabled JWT auth: {}".format(
+                         click.style(name, bold=True),
+                         click.style(account_type, bold=True),
+                         click.style(region, bold=True),
+                         click.style(endpoint, bold=True),
+                         click.style(jwt, bold=True)))
+        else:
+            lines.append([name, account_type, region, endpoint, jwt])
+    
+    if output in ["json", "yaml"]:
+        print_output(profiles, output)
+        return
+    elif output == 'wide':
+        for line in lines:
+            click.echo(line)
+    else:
+        table = prettytable.PrettyTable()
+        table.field_names = ["PROFILE", "ACCOUNT TYPE", "REGION", "ENDPOINT", "JWT ENABLED"]
+        table.add_rows(lines)
+        click.echo(table)
+
