@@ -8,6 +8,23 @@ def test_profile_list_command():
     assert result.exit_code == 0
     assert "There are no profiles" in result.output
 
+def test_profile_list_command_yaml():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "list", "--output", "yaml"])
+    assert result.exit_code == 0
+    assert "There are no profiles" in result.output
+
+def test_profile_list_command_jsonl():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "list", "--output", "json"])
+    assert result.exit_code == 0
+    assert "There are no profiles" in result.output
+
+def test_profile_list_command_widel():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "list", "--output", "wide"])
+    assert result.exit_code == 0
+    assert "There are no profiles" in result.output
 
 def test_profile_add_command():
     runner = CliRunner()
