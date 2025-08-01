@@ -9,7 +9,7 @@ from .profile import profile
 from .cache import cache
 from .quotas import quotas
 
-from .utils import ctx_update, login_profile, install_completions, profile_completer
+from .utils import ctx_update, login_profile, install_completions, profile_completer, do_request
 
 # Main CLI entry point
 @click.group(invoke_without_command=True)
@@ -80,6 +80,15 @@ def version():
     """Display the current CLI version."""
     import importlib.metadata
     print(importlib.metadata.version(__package__))
+
+@cli.command('myip', help="Show my current IP.")
+@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
+@click.pass_context
+def myip(ctx, profile):
+    _, _, profile = ctx_update(ctx, None, None, profile)
+    login_profile(profile)
+    data = do_request("GET", 'myip')
+    click.echo(data)
 
 @cli.command("install-completion", help="Install shell completion scripts.")
 @click.option('--type', help="Shell")
