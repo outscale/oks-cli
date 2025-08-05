@@ -6,7 +6,7 @@ import human_readable
 import prettytable
 import os
 
-from .utils import do_request, print_output, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer
+from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer
 
 # DEIFNE THE PROJECT COMMAND GROUP
 @click.group(help="Project related commands.")
@@ -351,7 +351,7 @@ def project_update_command(ctx, project_name, description, quirk, tags, disable_
 # GET PROJECT QUOTAS BY PROJECT NAME
 @project.command('quotas', help="Get project quotas")
 @click.option('--project-name', '-p', help="Name of the project")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('-o', '--output', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def project_get_quotas(ctx, project_name, output, profile):
@@ -362,7 +362,18 @@ def project_get_quotas(ctx, project_name, output, profile):
     project_id = find_project_id_by_name(project_name)
 
     data = do_request("GET", f'projects/{project_id}/quotas')["data"]
-    print_output(data, output)
+    if output == "table":
+        print_table(data["quotas"], [["Name", "Name"],
+                                     ["Collection", "QuotaCollection"],
+                                     ["Description", "ShortDescription"],
+                                     ["Max Value", "MaxValue"],
+                                     ["Used Value", "UsedValue"]])
+        print_table(data["subregions"], [["Region", "RegionName"],
+                                         ["Availability Zone", "SubregionName"],
+                                         ["State", "State"]])
+
+    else:
+        print_output(data, output)
 
 
 # GET PROJECT SNAPSHOTS BY PROJECT NAME

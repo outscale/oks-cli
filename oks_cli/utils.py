@@ -156,6 +156,27 @@ def print_output(data, output_fromat):
 
     click.echo(output_data)
 
+def print_table(data, table_fields, align="l"):
+    """Print API returned data as table
+    data: list of dict containing data
+    table_fields: List of 2 elements list. First element is the table field name, second element is the corresponding dict key in data
+    align: Columns alignment (l,r,c)
+    """
+    table = prettytable.PrettyTable()
+    table.align = align
+    fields = list()
+    values = list()
+
+    for d in table_fields:
+        fields.append(d[0])
+        values.append(d[1])
+
+    table.field_names = fields
+
+    for d in data:
+        table.add_row([d[v] if v in d else "" for v in values])
+    click.echo(table)
+
 def handle_otp_error(err, callback):
     """Handle OTP authentication error by prompting the user and retrying the request."""
     try:
