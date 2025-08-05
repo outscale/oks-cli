@@ -20,9 +20,15 @@ def test_profile_list_command_jsonl():
     assert result.exit_code == 0
     assert "There are no profiles" in result.output
 
-def test_profile_list_command_widel():
+def test_profile_list_command_wide():
     runner = CliRunner()
     result = runner.invoke(cli, ["profile", "list", "--output", "wide"])
+    assert result.exit_code == 0
+    assert "There are no profiles" in result.output
+
+def test_profile_list_command_table():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "list", "--output", "table"])
     assert result.exit_code == 0
     assert "There are no profiles" in result.output
 
