@@ -56,7 +56,7 @@ def test_nodepool_create_command(mock_request, mock_run, add_default_profile):
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["cluster", "nodepool", "-p", "test", "-c", "test", "create", "-n", "test"])
+    result = runner.invoke(cli, ["cluster", "nodepool", "-p", "test", "-c", "test", "create", "-n", "test", "--zone", "eu-west-2a"])
 
     args, kwargs = mock_run.call_args
 
