@@ -309,8 +309,13 @@ def login_profile(name):
     Raises an exception if the profile does not exist or lacks required info.
     """
     _, PROFILE_FILE = get_config_path()
+
+    # check is profile name is defined by user as environment variable
     if name is None:
-        name = "default"
+        if os.getenv('OKS_PROFILE') is None:
+            name = "default"
+        else:
+            name = os.getenv('OKS_PROFILE')
 
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, 'r') as file:
