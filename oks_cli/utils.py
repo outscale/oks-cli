@@ -389,6 +389,61 @@ def profile_completer(ctx, param, incomplete):
     profiles = get_profiles()
     return [CompletionItem(p) for p in profiles if p.startswith(incomplete)]
 
+def cluster_completer(ctx, param, incomplete):
+    profile = (
+        ctx.params.get("profile")
+        or getattr(ctx.parent, "params", {}).get("profile")
+        or getattr(getattr(ctx.parent, "parent", None), "params", {}).get("profile")
+        or "default"
+    )
+
+    try:
+        if profile:
+            login_profile(profile)
+    except Exception:
+        return []
+    
+    try:
+        project_id = get_project_id()
+    except NameError:
+        project_id = None
+
+    params = {}
+    if project_id:
+        params["project_id"] = project_id
+
+    try:
+        data = do_request("GET", "clusters", params=params)
+    except Exception:
+        return []
+
+    cluster_names = [c["name"] for c in data]
+    matches = [n for n in cluster_names if n.startswith(incomplete)] if incomplete else cluster_names
+    return [CompletionItem(n) for n in matches]
+
+def project_completer(ctx, param, incomplete):
+    profile = (
+        ctx.params.get("profile")
+        or getattr(ctx.parent, "params", {}).get("profile")
+        or getattr(getattr(ctx.parent, "parent", None), "params", {}).get("profile")
+        or "default"
+    )
+
+    try:
+        if profile:
+            login_profile(profile)
+    except Exception:
+        return []
+
+    try:
+        data = do_request("GET", "projects")
+    except Exception:
+        return []
+
+    project_names = [p["name"] for p in data]
+    matches = [n for n in project_names if n.startswith(incomplete)] if incomplete else project_names
+    return [CompletionItem(n) for n in matches]
+
 def set_profile(name, obj: dict):
     """Add or update a profile in the profiles file."""
     _, PROFILE_FILE = get_config_path()

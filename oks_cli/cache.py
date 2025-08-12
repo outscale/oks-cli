@@ -1,11 +1,11 @@
 import click
-from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_expiration_date, ctx_update, login_profile, profile_completer
+from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_expiration_date, ctx_update, login_profile, profile_completer, cluster_completer, project_completer
 import prettytable
 
 # DEFINE THE CACHE COMMAND GROUP
 @click.group(help="Cache related commands.")
-@click.option('--project-name', '-p', required = False, help="Project Name")
-@click.option('--cluster-name', '-c', required = False, help="Cluster Name")
+@click.option('--project-name', '-p', required = False, help="Project Name", shell_complete=project_completer)
+@click.option('--cluster-name', '-c', required = False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cache(ctx, project_name, cluster_name, profile):
@@ -20,8 +20,8 @@ def delete_cache(force):
         clear_cache()
 
 @cache.command('kubeconfigs', help="List cached kubeconfigs")
-@click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster Name")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
+@click.option('--cluster-name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--plain', is_flag=True, help="Plain table format")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
