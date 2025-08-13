@@ -1,6 +1,6 @@
 import click
 import prettytable
-from .utils import set_profile, remove_profile, profile_list, DEFAULT_API_URL, get_profiles, print_output
+from .utils import set_profile, remove_profile, profile_list, DEFAULT_API_URL, get_profiles, print_output, print_table
 
 
 # DEFINE THE PROFILE COMMAND GROUP
@@ -104,7 +104,7 @@ def delete_profile(profile_name, force):
         click.echo(f"Profile {profile_name_bold} has been successfully deleted")
 
 @profile.command('list', help="List existing profiles")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
+@click.option('-o', '--output', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, by default is wide")
 def list_profiles(output):
     """Display all configured profiles with their settings."""
     profiles = profile_list()
@@ -114,6 +114,7 @@ def list_profiles(output):
 
     profiles_keys = list(profiles.keys())
     lines = list()
+
     for key in profiles_keys:
         if 'endpoint' not in profiles[key]:
             if 'region_name' in profiles[key]:
@@ -136,7 +137,7 @@ def list_profiles(output):
         profiles[key].update({'endpoint': endpoint})
         profiles[key].update({'jwt': jwt})
 
-        if output == 'wide':
+        if output == 'wide' or output is None:
             lines.append("Profile: {} Account type: {} Region: {} Endpoint: {} Enabled JWT auth: {}".format(
                          click.style(name, bold=True),
                          click.style(account_type, bold=True),
@@ -144,17 +145,17 @@ def list_profiles(output):
                          click.style(endpoint, bold=True),
                          click.style(jwt, bold=True)))
         else:
-            lines.append([name, account_type, region, endpoint, jwt])
+            lines.append({"name": name, "account_type": account_type, "region": region, "endpoint": endpoint, "jwt": jwt})
     
-    if output in ["json", "yaml"]:
+    if output == "table":
+        print_table(lines, [["Profile", "name"],
+                            ["Account type", "account_type"],
+                            ["Region", "region"],
+                            ["Endpoint", "endpoint"],
+                            ["JWT enabled", "jwt"]])
+    elif output in ["json", "yaml"]:
         print_output(profiles, output)
-        return
-    elif output == 'wide':
+    else:
         for line in lines:
             click.echo(line)
-    else:
-        table = prettytable.PrettyTable()
-        table.field_names = ["PROFILE", "ACCOUNT TYPE", "REGION", "ENDPOINT", "JWT ENABLED"]
-        table.add_rows(lines)
-        click.echo(table)
-
+    return
