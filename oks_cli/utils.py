@@ -403,10 +403,20 @@ def cluster_completer(ctx, param, incomplete):
     except Exception:
         return []
     
+    project_name = ctx.params.get("project_name") or getattr(ctx.parent, "params", {}).get("project_name")
+
+    project_id = None
     try:
-        project_id = get_project_id()
-    except NameError:
-        project_id = None
+        projects = do_request("GET", "projects")
+        if project_name:
+            for p in projects:
+                if p["name"] == project_name:
+                    project_id = p["id"]
+                    break
+        else:
+            project_id = get_project_id()
+    except Exception:
+        return []
 
     params = {}
     if project_id:
