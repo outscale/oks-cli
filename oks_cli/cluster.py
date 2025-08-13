@@ -19,11 +19,9 @@ from .project import project_create, project_login
 
 # DEFINE THE CLUSTER GROUP
 @click.group(help="Cluster related commands.")
-@click.option('--project', 'project_name', required = False, help="Project Name")
-@click.option('--project-name', '-p', required = False, help="Project Name")
-@click.option('--name', 'cluster_name', required = False, help="Cluster Name")
-@click.option('--cluster-name', '-c', required = False, help="Cluster Name")
-@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--project-name', '-p', required=False, help="Project Name")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option("--profile", "-pr", help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster(ctx, project_name, cluster_name, profile):
     """Group of commands related to cluster management."""
@@ -31,8 +29,8 @@ def cluster(ctx, project_name, cluster_name, profile):
 
 # LOGIN ON CLUSTER
 @cluster.command('login', help="Set a default cluster")
-@click.option('--cluster-name', '-c', required=False, help="Name of cluster")
-@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--cluster-name', '--name', '-c', required=False, help="Name of cluster")
+@click.option("--profile", "-pr", help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_login(ctx, cluster_name, profile):
     """Set the specified cluster as the default active cluster."""
@@ -59,7 +57,7 @@ def cluster_login(ctx, cluster_name, profile):
 
 # LOGOUT ON CLUSTER
 @cluster.command('logout', help="Unset default cluster")
-@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
+@click.option("--profile", "-pr", help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_logout(ctx, profile):
     """Clear the current default cluster selection."""
@@ -71,14 +69,13 @@ def cluster_logout(ctx, profile):
 # LIST CLUSTERS
 @cluster.command('list', help="List all clusters")
 @click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--name', 'cluster_name', required = False, help="Cluster Name")
-@click.option('--cluster-name', '-c', required = False, help="Cluster Name")
-@click.option('--deleted', is_flag=True, help="List deleted clusters")
-@click.option('--plain', is_flag=True, help="Plain table format")
-@click.option('--msword', is_flag=True, help="Microsoft Word table format")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option('--deleted', '-x', is_flag=True, help="List deleted clusters")  # x pour "deleted" / "removed"
+@click.option('--plain', '-pl', is_flag=True, help="Plain table format")
+@click.option('--msword', '-mw', is_flag=True, help="Microsoft Word table format")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
-@click.option('--profile', help="Configuration profile to use")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
+@click.option('--profile', '-pr', help="Configuration profile to use")
 @click.pass_context
 def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, output, profile):
     """Display clusters with optional filtering and real-time monitoring."""
@@ -215,11 +212,10 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
 # GET CLUSTER BY NAME
 @cluster.command('get', help="Get a cluster by name")
-@click.option('--project-name', '-p', required = False, help="Project Name")
-@click.option('--name', 'cluster_name', required=False, help="Cluster Name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster Name")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--project-name', '-p', required=False, help="Project Name")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_get_command(ctx, project_name, cluster_name, output, profile):
     """Retrieve and display detailed information about a specific cluster."""
@@ -313,23 +309,23 @@ def _create_cluster(project_name, cluster_config, output):
 @cluster.command('create', help="Create a new cluster")
 @click.option('--project-name', '-p', required=False, help="Project Name")
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
-@click.option('--description', help="Description of the cluster")
-@click.option('--admin', help="Admin Whitelist")
-@click.option('--version', shell_complete=shell_completions, help="Kubernetes version")
+@click.option('--description', '-d', help="Description of the cluster")
+@click.option('--admin', '-a', help="Admin Whitelist")
+@click.option('--version', '-v', shell_complete=shell_completions, help="Kubernetes version")
 @click.option('--cidr-pods', help="CIDR of pods")
 @click.option('--cidr-service', help='CIDR of services')
 @click.option('--control-plane', shell_complete=shell_completions, help="Controlplane plan")
-@click.option('--zone', multiple=True, shell_complete=shell_completions, help="List of Control Plane availability zones")
+@click.option('--zone', '-z', multiple=True, shell_complete=shell_completions, help="List of Control Plane availability zones")
 @click.option('--enable-admission-plugins', help="List of admission plugins, separated by commas")
 @click.option('--disable-admission-plugins', help="List of admission plugins, separated by commas")
-@click.option('--quirk', multiple=True, help="Quirk")
-@click.option('--tags', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
+@click.option('--quirk', '-q', multiple=True, help="Quirk")
+@click.option('--tags', '-t', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
-@click.option('--cp-multi-az', is_flag=True, help="enable control plane multi az")
+@click.option('--cp-multi-az', '-m', is_flag=True, help="Enable control plane multi AZ")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
-@click.option('-f', '--filename', type=click.File("r"), help="Path to file to use to create the cluster ")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the cluster ")
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, cp_multi_az, dry_run, output, filename, profile):
     """CLI command to create a new Kubernetes cluster with optional configuration parameters."""
@@ -412,21 +408,20 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 # UPDATE CLUSTER
 @cluster.command('update', help="Update a cluster by name")
 @click.option('--project-name', '-p', required=False, help="Project name")
-@click.option('--name', 'cluster_name', required=False, help="Cluster name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster name")
-@click.option('--description', help="Description of the cluster")
-@click.option('--admin', help="Admin Whitelist")
-@click.option('--version', shell_complete=shell_completions, help="Kubernetes version")
-@click.option('--tags', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name")
+@click.option('--description', '-d', help="Description of the cluster")
+@click.option('--admin', '-a', help="Admin Whitelist")
+@click.option('--version', '-v', shell_complete=shell_completions, help="Kubernetes version")
+@click.option('--tags', '-t', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
 @click.option('--enable-admission-plugins', help="List of admission plugins, separated by commas")
 @click.option('--disable-admission-plugins', help="List of admission plugins, separated by commas")
-@click.option('--quirk', multiple=True, help="Quirk")
+@click.option('--quirk', '-q', multiple=True, help="Quirk")
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
 @click.option('--control-plane', shell_complete=shell_completions, help="Controlplane plan")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
-@click.option('-f', '--filename', type=click.File("r"), help="Path to file to use to update the cluster ")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to update the cluster ")
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, dry_run, output, filename, profile):
     """CLI command to update an existing Kubernetes cluster with new configuration options."""
@@ -500,11 +495,10 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
 # UPGRADE CLUSTER
 @cluster.command('upgrade', help="Upgrade a cluster by name")
 @click.option('--project-name', '-p', required=False, help="Project name")
-@click.option('--name', 'cluster_name', required=False, help="Cluster name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster name")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--force', is_flag=True, help="Force upgrade")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_update_command(ctx, project_name, cluster_name, output, force, profile):
     """CLI command to upgrade an existing Kubernetes cluster to the latest supported version."""
@@ -522,12 +516,11 @@ def cluster_update_command(ctx, project_name, cluster_name, output, force, profi
 # DELETE CLUSTER BY NAME
 @cluster.command('delete', help="Delete a cluster by name")
 @click.option('--project-name', '-p', required=False, help="Project name")
-@click.option('--name', 'cluster_name', required=False, help="Cluster name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster name")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, force, profile):
     """CLI command to delete an existing Kubernetes cluster by name."""
@@ -554,15 +547,14 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 # GET KUBECONFIG
 @cluster.command('kubeconfig', help="Fetch the kubeconfig for a cluster")
 @click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--name', 'cluster_name', required=False, help="Cluster name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster Name")
-@click.option('--print-path', is_flag=True, help="Print path to saved kubeconfig")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option('--print-path', '-pp', is_flag=True, help="Print path to saved kubeconfig")
 @click.option('--refresh', '--force', is_flag=True, help="Force refresh saved kubeconfig")
 @click.option('--nacl', is_flag=True, help="Use public key encryption on wire (require api support)")
-@click.option('--user', type=click.STRING, help="User")
-@click.option('--group', type=click.STRING, help="Group")
-@click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--user', '-u', type=click.STRING, help="User")
+@click.option('--group', '-g', type=click.STRING, help="Group")
+@click.option('--ttl', '-t', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, refresh, nacl, user, group, ttl, profile):
     """CLI command to fetch and optionally print the kubeconfig for a specified cluster."""
@@ -664,11 +656,11 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
 @click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster Name")
-@click.option('--user', type=click.STRING, help="User")
-@click.option('--group', type=click.STRING, help="Group")
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option('--user', '-u', type=click.STRING, help="User")
+@click.option('--group', '-g', type=click.STRING, help="Group")
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_kubectl_command(ctx, project_name, cluster_name, user, group, args, profile):
     """CLI command to run kubectl against a specified cluster using its kubeconfig."""
@@ -681,12 +673,12 @@ def cluster_kubectl_command(ctx, project_name, cluster_name, user, group, args, 
     _run_kubectl(project_id, cluster_id, user, group, args)
 
 
-@click.group(help="nodepool related commands.")
+@click.group(help="Nodepool related commands.")
 @click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--cluster-name', '-c', required=False, help="Cluster Name")
-@click.option('--user', type=click.STRING, help="User")
-@click.option('--group', type=click.STRING, help="Group")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option('--user', '-u', type=click.STRING, help="User")
+@click.option('--group', '-g', type=click.STRING, help="Group")
+@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def nodepool(ctx, project_name, cluster_name, user, group, profile):
     """CLI group for nodepool-related commands, managing project, cluster, user, and profile context."""
@@ -711,14 +703,14 @@ def nodepool_list(ctx):
                  'get', 'nodepool', '-o', 'wide'])
 
 
-@nodepool.command('create')
+@nodepool.command('create', help="Create a new nodepool")
 @click.option('--nodepool-name', '-n', default="nodepool01", help="Nodepool Name")
-@click.option('--count', default=2, help="Count of nodes")
-@click.option('--type', 'vmtype', default="tinav6.c2r4p3", help="Type of VMs")
-@click.option('--zone', multiple=True, required=True, help="Provide zone")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--count', '-c', default=2, help="Count of nodes")
+@click.option('--type', 'vmtype', '-t', default="tinav6.c2r4p3", help="Type of VMs")
+@click.option('--zone', '-z', multiple=True, required=True, help="Provide zone(s)")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
-@click.option('-f', '--filename', type=click.File("r"), help="Path to file to use to create the Nodepool ")
+@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the Nodepool")
 @click.pass_context
 def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, filename):
     """Create a new nodepool in the cluster, optionally from a file or parameters."""

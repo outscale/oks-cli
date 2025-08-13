@@ -3,8 +3,8 @@ import prettytable
 from .utils import do_request, print_output, print_table, ctx_update, login_profile, profile_completer
 
 @click.command(help="Get Quotas")
-@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
-@click.option('-o', '--output', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
+@click.option("--profile", "-pr", help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--output','-o', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.pass_context
 def quotas(ctx, profile, output):
     """Retrieve global quotas across all projects for the given profile."""
