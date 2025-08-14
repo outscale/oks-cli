@@ -89,3 +89,16 @@ def test_cluster_dynamic_shell_completion_suggestions(mock_request, add_default_
     result = runner.invoke(cli, [], env=get_env("update", "--control-plane"))
     assert "plain,cp.3.masters.small" in result.output
     assert "plain,cp.3.masters.medium" in result.output
+
+def test_profile_dynamic_shell_completion_suggestions(add_default_profile):
+    env = {
+        "_CLI_COMPLETE": "bash_complete",
+        "COMP_WORDS": "cli --profile",
+        "COMP_CWORD": "3",
+        "COMP_LINE": "cli --profile",
+        "COMP_POINT": str(len("cli --profile")),
+    }
+    runner = CliRunner()
+
+    result = runner.invoke(cli, [], env=env)
+    assert "plain,default" in result.output
