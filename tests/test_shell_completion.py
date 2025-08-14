@@ -1,6 +1,7 @@
 from click.testing import CliRunner
 from oks_cli.main import cli
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 
 def test_install_completion_zsh():
@@ -40,3 +41,51 @@ def test_bash_completion_suggestions():
     }
     result = runner.invoke(cli, [], env=env)
     assert "plain,cluster" in result.output
+
+@patch("oks_cli.utils.requests.request")
+def test_cluster_dynamic_shell_completion_suggestions(mock_request, add_default_profile):
+    def get_env(action: str, flag: str):
+        return {
+            "_CLI_COMPLETE": "bash_complete",
+            "COMP_WORDS": f"cli cluster {action} -p test -c test {flag}",
+            "COMP_CWORD": "8",
+            "COMP_LINE": f"cli cluster {action} -p test -c test {flag}",
+            "COMP_POINT": str(len(f"cli cluster {action} -p test -c test {flag}")),
+        }
+
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Versions": ["1.33"]})
+    ]
+    runner = CliRunner()
+
+    result = runner.invoke(cli, [], env=get_env("create", "--version"))
+    assert "plain,1.33" in result.output
+
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "ControlPlanes": ["cp.3.masters.small", "cp.3.masters.medium"]})
+    ]
+
+    result = runner.invoke(cli, [], env=get_env("create", "--control-plane"))
+    assert "plain,cp.3.masters.small" in result.output
+    assert "plain,cp.3.masters.medium" in result.output
+
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "CPSubregions": ["2a", "2b", "2c"]})
+    ]
+
+    result = runner.invoke(cli, [], env=get_env("create", '--zone'))
+    assert "plain,2a" in result.output
+    assert "plain,2b" in result.output
+    assert "plain,2c" in result.output
+
+
+    result = runner.invoke(cli, [], env=get_env("update", "--version"))
+    assert "plain,1.33" in result.output
+
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "ControlPlanes": ["cp.3.masters.small", "cp.3.masters.medium"]})
+    ]
+
+    result = runner.invoke(cli, [], env=get_env("update", "--control-plane"))
+    assert "plain,cp.3.masters.small" in result.output
+    assert "plain,cp.3.masters.medium" in result.output
