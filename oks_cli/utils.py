@@ -834,7 +834,6 @@ def ctx_update(ctx, project_name=None, cluster_name=None, profile=None, overwrit
             raise click.BadParameter("profile already set before")
         ctx.obj['profile'] = profile
 
-    print("[ctx_update] Profile={}".format(ctx.obj.get('profile')), file=sys.stderr)
     return (ctx.obj.get('project_name'), ctx.obj.get('cluster_name'), ctx.obj.get('profile'))
 
 def get_project_name(project_name):
