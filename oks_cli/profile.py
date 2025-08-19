@@ -63,15 +63,18 @@ def add_profile(profile_name, access_key, secret_key, username, password, region
 
 @profile.command('update', help="Update an existing profile")
 @click.option('--profile-name', required=True, help="Name of profile", type=click.STRING)
+@click.option('--new-name', required=False, help="Update profile name with new one, USE IT WITH CAUTION", type=click.STRING)
 @click.option('--region', required=False, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', required=False, help="Enable jwt, by default is false", type=click.BOOL)
-def update_profile(profile_name, region, endpoint, jwt):
+@click.option('--force', is_flag=True, help="Force update profile name without confirmation")
+def update_profile(profile_name, region, endpoint, jwt, new_name, force):
     """Update configuration settings for an existing profile."""
     profiles = profile_list()
     if profile_name not in profiles:
-        raise click.ClickException(f"There no profile with name: {profile_name}")
+        raise click.ClickException(f"There is no profile with name: {profile_name}")
 
+    msg = f"Profile {profile_name} has been successfully updated"
     profile = profiles[profile_name]
     if region:
         profile["region_name"] = region
@@ -82,11 +85,17 @@ def update_profile(profile_name, region, endpoint, jwt):
     if jwt is not None:
         profile["jwt"] = jwt
 
+    if new_name is not None:
+        old_profile = click.style(profile_name, bold=True)
+        new_profile = click.style(new_name, bold=True)
+        if force or click.confirm(f"Are you sure you want to update the profile {old_profile} with new name {new_profile}?", abort=True):
+            remove_profile(profile_name)
+            profile_name = new_name
+            msg = f"Profile {old_profile} has been successfully updated with new name {new_profile}"
+
     set_profile(profile_name, profile)
-
     profile_name = click.style(profile_name, bold=True)
-
-    click.echo(f"Profile {profile_name} has been successfully updated")
+    click.echo(msg)
 
 @profile.command('delete', help="Delete a profile by name")
 @click.option('--profile-name', required=True, help="Name of profile", type=click.STRING)
