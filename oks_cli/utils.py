@@ -732,17 +732,6 @@ def find_shell_profile(home, shell_type):
 def install_completions(shell_type):
     """Install shell completion scripts for bash or zsh."""
     home = os.path.expanduser('~')
-
-    if shell_type is None:
-        try:
-            shell_pid = os.getppid()
-            result = subprocess.run(['ps', '-p', str(shell_pid), '-o', 'comm='], capture_output=True, text=True)
-            shell_name = result.stdout.strip()
-            
-            shell_type = os.path.basename(shell_name)
-        except subprocess.SubProcessError:
-            click.echo("Failed to determine shell type, please specify it by --type")
-
     completion_dir = os.path.join(home, ".oks_cli", "completions")
     os.makedirs(completion_dir, exist_ok=True)
 
@@ -774,7 +763,7 @@ def install_completions(shell_type):
                 click.style('source "$HOME/.oks_cli/completions/oks-cli.sh"\n', bold=True)
             )
     else:
-        click.echo(f"Shell completions for {shell_type} are not implemented.")
+        raise click.UsageError(f"Shell completions for {shell_type} are not implemented.")
 
 def transform_tuple(data):
     """Convert tuple to list unless it contains only an empty string."""
