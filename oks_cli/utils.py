@@ -89,25 +89,35 @@ def do_request(method, path, *args, **kwargs):
     logging.info("%s request %s?%s", method, url,
                  urlencode(kwargs.get('params', {})))
 
-    try:
-        data = requests.request(method, url, *args, **kwargs)
-        logging.info("response %s %s %s...", data.status_code,
-                    data.reason, data.text[:50])
-        data.raise_for_status()
-        save_tokens(data.headers)
-        obj = find_response_object(data)
-        return obj
-    except requests.exceptions.HTTPError as err:
-        otp_response = handle_otp_error(err, lambda: do_request(method, path, *args, **kwargs))
-        if otp_response is not None:
-            return otp_response
+    retries = int(os.getenv('OKS_RETRIES', 3)) if method.upper() == "GET" else 1
+    backoff = 1
 
-        jwt_response = handle_jwt_error(err, method, path, args, kwargs)
-        if jwt_response is not None:
-            return jwt_response
+    for attempt in range(1, retries + 1):
+        try:
+            data = requests.request(method, url, *args, **kwargs)
+            logging.info("response %s %s %s...", data.status_code,
+                        data.reason, data.text[:50])
+            data.raise_for_status()
+            save_tokens(data.headers)
+            obj = find_response_object(data)
+            return obj
+        except requests.exceptions.HTTPError as err:
+            otp_response = handle_otp_error(err, lambda: do_request(method, path, *args, **kwargs))
+            if otp_response is not None:
+                return otp_response
 
-        logging.debug(traceback.format_stack(limit = 4))
-        raise JSONClickException(err.response.text)
+            jwt_response = handle_jwt_error(err, method, path, args, kwargs)
+            if jwt_response is not None:
+                return jwt_response
+
+            if attempt < retries and method.upper() == "GET":
+                logging.info("GET failed (attempt %s/%s), retrying in %s sec...", attempt, retries, backoff)
+                time.sleep(backoff)
+                backoff *= 2  # exponential backoff
+                continue
+
+            logging.debug(traceback.format_stack(limit = 4))
+            raise JSONClickException(err.response.text)
 
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
