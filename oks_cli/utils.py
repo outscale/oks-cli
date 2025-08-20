@@ -716,8 +716,8 @@ def install_completions(shell_type):
             shell_pid = os.getppid()
             result = subprocess.run(['ps', '-p', str(shell_pid), '-o', 'comm='], capture_output=True, text=True)
             shell_name = result.stdout.strip()
-            
-            shell_type = os.path.basename(shell_name)
+
+            shell_type = os.path.basename(shell_name).lstrip('-')
         except subprocess.SubProcessError:
             click.echo("Failed to determine shell type, please specify it by --type")
 
