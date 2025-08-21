@@ -119,6 +119,10 @@ def do_request(method, path, *args, **kwargs):
             logging.debug(traceback.format_stack(limit = 4))
             raise JSONClickException(err.response.text)
 
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+            errors = {"Error": f"Failed to reach the endpoint {url} ({err.__class__.__name__})"}
+            raise JSONClickException(json.dumps(errors))
+
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
     headers = {
