@@ -38,13 +38,18 @@ def test_profile_add_command():
     assert result.exit_code == 0
     assert "Profile default has been successfully added" in result.output
 
-
 def test_profile_update_command(add_default_profile):
     runner = CliRunner()
     result = runner.invoke(cli, ["profile", "update", "--profile-name", "default", "--region", "cloudgouv-eu-west-1"])
     assert result.exit_code == 0
     assert "Profile default has been successfully updated" in result.output
 
+def test_profile_update_name_command(add_default_profile):
+    """Update a profile changing its name"""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "update", "--profile-name", "default", "--new-name", "test", "--force"])
+    assert result.exit_code == 0
+    assert "Profile default has been successfully updated with new name test" in result.output
 
 def test_profile_delete_command(add_default_profile):
     runner = CliRunner()

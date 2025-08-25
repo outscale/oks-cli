@@ -82,7 +82,7 @@ def version():
     print(importlib.metadata.version(__package__))
 
 @cli.command("install-completion", help="Install shell completion scripts.")
-@click.option('--type', help="Shell")
+@click.option('--type', required=True, help="Shell, supported [bash,zsh]")
 def install_completion(type):
     """Install shell completion scripts for the CLI."""
     install_completions(type)
