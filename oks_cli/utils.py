@@ -119,6 +119,10 @@ def do_request(method, path, *args, **kwargs):
             logging.debug(traceback.format_stack(limit = 4))
             raise JSONClickException(err.response.text)
 
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+            errors = {"Error": f"Failed to reach the endpoint {url} ({err.__class__.__name__})"}
+            raise JSONClickException(json.dumps(errors))
+
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
     headers = {
@@ -384,6 +388,71 @@ def profile_completer(ctx, param, incomplete):
     """Autocomplete profile names starting with input."""
     profiles = get_profiles()
     return [CompletionItem(p) for p in profiles if p.startswith(incomplete)]
+
+def cluster_completer(ctx, param, incomplete):
+    profile = (
+        ctx.params.get("profile")
+        or getattr(ctx.parent, "params", {}).get("profile")
+        or getattr(getattr(ctx.parent, "parent", None), "params", {}).get("profile")
+        or "default"
+    )
+
+    try:
+        if profile:
+            login_profile(profile)
+    except Exception:
+        return []
+    
+    project_name = ctx.params.get("project_name") or getattr(ctx.parent, "params", {}).get("project_name")
+
+    project_id = None
+    try:
+        projects = do_request("GET", "projects")
+        if project_name:
+            for p in projects:
+                if p["name"] == project_name:
+                    project_id = p["id"]
+                    break
+        else:
+            project_id = get_project_id()
+    except Exception:
+        return []
+
+    params = {}
+    if project_id:
+        params["project_id"] = project_id
+
+    try:
+        data = do_request("GET", "clusters", params=params)
+    except Exception:
+        return []
+
+    cluster_names = [c["name"] for c in data]
+    matches = [n for n in cluster_names if n.startswith(incomplete)] if incomplete else cluster_names
+    return [CompletionItem(n) for n in matches]
+
+def project_completer(ctx, param, incomplete):
+    profile = (
+        ctx.params.get("profile")
+        or getattr(ctx.parent, "params", {}).get("profile")
+        or getattr(getattr(ctx.parent, "parent", None), "params", {}).get("profile")
+        or "default"
+    )
+
+    try:
+        if profile:
+            login_profile(profile)
+    except Exception:
+        return []
+
+    try:
+        data = do_request("GET", "projects")
+    except Exception:
+        return []
+
+    project_names = [p["name"] for p in data]
+    matches = [n for n in project_names if n.startswith(incomplete)] if incomplete else project_names
+    return [CompletionItem(n) for n in matches]
 
 def set_profile(name, obj: dict):
     """Add or update a profile in the profiles file."""
