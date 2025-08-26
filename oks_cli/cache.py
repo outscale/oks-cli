@@ -6,7 +6,7 @@ import prettytable
 @click.group(help="Cache related commands.")
 @click.option('--project-name', '-p', required = False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required = False, help="Cluster Name", shell_complete=cluster_completer)
-@click.option("--profile", "-pr", help="Configuration profile to use", shell_complete=profile_completer)
+@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cache(ctx, project_name, cluster_name, profile):
     """CLI command group for cache-related operations."""
@@ -22,9 +22,9 @@ def delete_cache(force):
 @cache.command('kubeconfigs', help="List cached kubeconfigs")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
-@click.option('--plain', '-pl', is_flag=True, help="Plain table format")
-@click.option('--msword', '-mw', is_flag=True, help="Microsoft Word table format")
-@click.option('--profile', "-pr", help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--plain', is_flag=True, help="Plain table format")
+@click.option('--msword', is_flag=True, help="Microsoft Word table format")
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
     """Display cached kubeconfigs with expiration dates in table format."""

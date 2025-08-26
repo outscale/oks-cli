@@ -13,7 +13,7 @@ from .utils import ctx_update, install_completions, profile_completer, cluster_c
 
 # Main CLI entry point
 @click.group(invoke_without_command=True)
-@click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--verbose', '-v', count=True, help="Increase verbosity")
