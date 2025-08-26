@@ -6,11 +6,12 @@ import human_readable
 import prettytable
 import os
 
-from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer
+from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer
 
 # DEIFNE THE PROJECT COMMAND GROUP
 @click.group(help="Project related commands.")
-@click.option('--project-name', '-p', required=False, help="Project Name")
+@click.option('--project', 'project_name', required = False, help="Project Name")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def project(ctx, project_name, profile):
@@ -19,7 +20,7 @@ def project(ctx, project_name, profile):
 
 # LOGIN ON PROJECT
 @project.command('login', help="Set a default project by name")
-@click.option('--project-name', '-p', required=False, help="Name of project", type=click.STRING)
+@click.option('--project-name', '-p', required=False, help="Name of project", type=click.STRING, shell_complete=project_completer)
 @click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def project_login(ctx, project_name, profile):
@@ -57,7 +58,7 @@ def project_logout(ctx, profile):
 
 # LIST PROJECTS
 @project.command('list', help="List all projects")
-@click.option('--project-name', '-p', help="Name of project", type=click.STRING)
+@click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
 @click.option('--deleted', '-x', is_flag=True, help="List deleted projects")
 @click.option('--plain', '-pl', is_flag=True, help="Plain table format")
 @click.option('--msword', '-mw', is_flag=True, help="Microsoft Word table format")
@@ -192,7 +193,7 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 
 # CREATE PROJECT BY NAME
 @project.command('create', help="Create a new project")
-@click.option('--project-name', '-p', help="Name of the project", type=click.STRING)
+@click.option('--project-name', '-p', help="Name of the project", type=click.STRING, shell_complete=project_completer)
 @click.option('--description', '-d', help="Description of the project")
 @click.option('--cidr', help='CIDR for the project')
 @click.option('--quirk', '-q', multiple=True, help="Quirk")
@@ -253,7 +254,7 @@ def project_create(ctx, project_name, description, cidr, quirk, tags, disable_ap
 
 # GET PROJECT BY NAME
 @project.command('get', help="Get default project or the project by name")
-@click.option('--project-name', '-p', help="Name of the project")
+@click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
@@ -269,7 +270,7 @@ def project_get(ctx, project_name, output, profile):
 
 # DELETE PROJECT BY NAME
 @project.command('delete', help="Delete a project by name")
-@click.option('--project-name', '-p', required=False, help="Project Name", type=click.STRING)
+@click.option('--project-name', '-p', required=False, help="Project Name", type=click.STRING, shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
@@ -301,7 +302,7 @@ def project_delete_command(ctx, project_name, output, dry_run, force, profile):
 
 # UPDATE PROJECT BY NAME
 @project.command('update', help="Update a project by name")
-@click.option('--project-name', '-p', required=False, help="Project Name", type=click.STRING)
+@click.option('--project-name', '-p', required=False, help="Project Name", type=click.STRING, shell_complete=project_completer)
 @click.option('--description', '-d', help="Description of the project")
 @click.option('--quirk', '-q', multiple=True, help="Quirk")
 @click.option('--tags', '-t', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
@@ -349,7 +350,7 @@ def project_update_command(ctx, project_name, description, quirk, tags, disable_
 
 # GET PROJECT QUOTAS BY PROJECT NAME
 @project.command('quotas', help="Get project quotas")
-@click.option('--project-name', '-p', help="Name of the project")
+@click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
@@ -377,7 +378,7 @@ def project_get_quotas(ctx, project_name, output, profile):
 
 # GET PROJECT SNAPSHOTS BY PROJECT NAME
 @project.command('snapshots', help="Get project snapshots")
-@click.option('--project-name', '-p', help="Name of the project")
+@click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
@@ -393,7 +394,7 @@ def project_get(ctx, project_name, output, profile):
 
 # GET PUBLIC IPS BY PROJECT NAME
 @project.command('publicips', help="Get project public ips")
-@click.option('--project-name', '-p', help="Name of the project")
+@click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', '-pr',help="Configuration profile to use")
 @click.pass_context

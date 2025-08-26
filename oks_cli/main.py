@@ -9,13 +9,13 @@ from .profile import profile
 from .cache import cache
 from .quotas import quotas
 
-from .utils import ctx_update, install_completions, profile_completer
+from .utils import ctx_update, install_completions, profile_completer, cluster_completer, project_completer
 
 # Main CLI entry point
 @click.group(invoke_without_command=True)
 @click.option('--profile', '-pr', help="Configuration profile to use", shell_complete=profile_completer)
-@click.option('--project-name', '-p', required=False, help="Project Name")
-@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--verbose', '-v', count=True, help="Increase verbosity")
 @click.pass_context
 def cli(ctx, project_name, cluster_name, profile, verbose):
@@ -82,7 +82,7 @@ def version():
     print(importlib.metadata.version(__package__))
 
 @cli.command("install-completion", help="Install shell completion scripts.")
-@click.option('--type', required=True, help="Shell, supported [bash,zsh]")
+@click.option('--type', help="Shell, supported [bash,zsh]")
 def install_completion(type):
     """Install shell completion scripts for the CLI."""
     install_completions(type)
