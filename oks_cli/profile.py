@@ -99,7 +99,7 @@ def update_profile(profile_name, region, endpoint, jwt, new_name, force):
 
 @profile.command('delete', help="Delete a profile by name")
 @click.option('--profile-name', '--profile', required=True, help="Name of profile", type=click.STRING)
-@click.option('--force', is_flag=True, help="Force deletion without confirmation")
+@click.option('--force', '-f', is_flag=True, help="Force deletion without confirmation")
 def delete_profile(profile_name, force):
     """Delete a profile with confirmation."""
     profiles = profile_list()
