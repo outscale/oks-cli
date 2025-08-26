@@ -11,13 +11,13 @@ def profile():
 
 
 @profile.command('add', help="Add AK/SK or username/password new profile")
-@click.option('--profile-name', '--profile', '-pr', required=False, help="Name of profile, optional", type=click.STRING)
-@click.option('--access-key', '-ak', required=False, help="AK of profile", type=click.STRING)
-@click.option('--secret-key', '-sk', required=False, help="SK of profile", type=click.STRING)
-@click.option('--username', '-u', required=False, help="Username", type=click.STRING)
-@click.option('--password', '-p', required=False, help="Password", type=click.STRING)
-@click.option('--region', '-r', required=True, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
-@click.option('--endpoint', '-e', required=False, help="API endpoint", type=click.STRING)
+@click.option('--profile-name', '--profile', required=False, help="Name of profile, optional", type=click.STRING)
+@click.option('--access-key', required=False, help="AK of profile", type=click.STRING)
+@click.option('--secret-key', required=False, help="SK of profile", type=click.STRING)
+@click.option('--username', required=False, help="Username", type=click.STRING)
+@click.option('--password', required=False, help="Password", type=click.STRING)
+@click.option('--region', required=True, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
+@click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', help="Enable JWT, by default is false")
 def add_profile(profile_name, access_key, secret_key, username, password, region, endpoint, jwt):
     """Add a new profile with AK/SK or username/password authentication."""
@@ -62,10 +62,10 @@ def add_profile(profile_name, access_key, secret_key, username, password, region
     click.echo(f"Profile {profile_name_styled} has been successfully added")
 
 @profile.command('update', help="Update an existing profile")
-@click.option('--profile-name', '-pr', required=True, help="Name of profile", type=click.STRING)
+@click.option('--profile-name', required=True, help="Name of profile", type=click.STRING)
 @click.option('--new-name', required=False, help="Update profile name with new one, USE IT WITH CAUTION", type=click.STRING)
-@click.option('--region', '-r', required=False, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
-@click.option('--endpoint', '-e', required=False, help="API endpoint", type=click.STRING)
+@click.option('--region', required=False, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
+@click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', required=False, help="Enable jwt, by default is false", type=click.BOOL)
 @click.option('--force', is_flag=True, help="Force update profile name without confirmation")
 def update_profile(profile_name, region, endpoint, jwt, new_name, force):
@@ -98,8 +98,8 @@ def update_profile(profile_name, region, endpoint, jwt, new_name, force):
     click.echo(msg)
 
 @profile.command('delete', help="Delete a profile by name")
-@click.option('--profile-name', '--profile', '-pr', required=True, help="Name of profile", type=click.STRING)
-@click.option('--force', '-f', is_flag=True, help="Force deletion without confirmation")
+@click.option('--profile-name', '--profile', required=True, help="Name of profile", type=click.STRING)
+@click.option('--force', is_flag=True, help="Force deletion without confirmation")
 def delete_profile(profile_name, force):
     """Delete a profile with confirmation."""
     profiles = profile_list()
