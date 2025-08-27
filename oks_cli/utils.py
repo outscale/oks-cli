@@ -697,16 +697,53 @@ def get_expiration_date(kubeconfig_str):
             logging.info("No client certificate data found for user.")
             continue
 
-        ca_cert = base64.b64decode(client_cert_data)
+        cert = decode_parse_certificate(client_cert_data)
+        not_after = cert.get_notAfter().decode('ascii')
+        not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
 
-        try:
-            cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, ca_cert)
-            not_after = cert.get_notAfter().decode('ascii')
-            not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
+        return not_after_date
 
-            return not_after_date
-        except OpenSSL.crypto.Error as e:
-             logging.info(f"ERROR: Invalid certificate data for cluster. Error: {e}")
+def decode_parse_certificate(cert_str):
+    """Parse base64 encoded certificate data and returns cert (X509) object"""
+    ca_cert = base64.b64decode(cert_str)
+    try:
+        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, ca_cert)
+        return cert
+    except OpenSSL.crypto.Error as e:
+        logging.info(f"ERROR: Can't parse base64 encoded certificate: {e}")
+
+def kubeconfig_extract_fields(kubeconfig, cluster_name, user, group):
+    """Load YAML kubeconfig and extract fields"""
+    kubeconfig_str = yaml.safe_load(kubeconfig)
+    kubedata = list()
+
+    for context in kubeconfig_str.get('contexts', []):
+        data = dict()
+        ctx_cluster = context.get('context').get('cluster', None)
+        ctx_user = context.get('context').get('user', None)
+        ctx_name = context.get('name')
+        data.update({"context_name": ctx_name})
+
+        for cluster in kubeconfig_str.get('clusters', []):
+            if ctx_cluster == cluster.get('name', None):
+                cls_server = cluster.get('cluster').get('server')
+                if cluster_name:
+                    ctx_cluster = f"{ctx_cluster} ({cluster_name})"
+                data.update({"cluster_name": f"{ctx_cluster}",
+                                "server_name": cls_server})
+                break
+
+        for user_name in kubeconfig_str.get('users', []):
+            if ctx_user == user_name.get('name'):
+                cert_str = user_name.get('user').get('client-certificate-data')
+                expires_at = datetime.strptime(decode_parse_certificate(cert_str).get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
+                cn = []
+                for n in decode_parse_certificate(cert_str).get_subject().get_components():
+                    cn.append('='.join([n[0].decode('utf-8'), n[1].decode('utf-8')]))
+                data.update({"expires_at": expires_at, "user_name": ctx_user, "cn": "/".join(cn)})
+                break
+        kubedata.append(data)
+    return kubedata
 
 def retrieve_cp_sized(filepath, endpoint):
     """Fetch control plane sizes from API and save to file."""

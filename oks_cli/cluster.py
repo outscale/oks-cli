@@ -6,13 +6,22 @@ from nacl.encoding import Base64Encoder
 
 import time
 import os
-import datetime
+from datetime import datetime
 import dateutil.parser
 import human_readable
 import prettytable
 import logging
+import yaml
 
-from .utils import cluster_completer, do_request, print_output, find_project_id_by_name, find_cluster_id_by_name, get_cache, save_cache, detect_and_parse_input, verify_certificate, shell_completions, transform_tuple, profile_list, login_profile, cluster_create_in_background, ctx_update, set_cluster_id, get_cluster_id, get_project_id, get_template, get_cluster_name, format_changed_row, is_interesting_status, profile_completer, project_completer
+from .utils import cluster_completer, do_request, print_output,                 \
+                   find_project_id_by_name, find_cluster_id_by_name,            \
+                   get_cache, save_cache, detect_and_parse_input,               \
+                   verify_certificate, shell_completions, transform_tuple,      \
+                   profile_list, login_profile, cluster_create_in_background,   \
+                   ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
+                   get_template, get_cluster_name, format_changed_row,          \
+                   is_interesting_status, profile_completer, project_completer, \
+                   kubeconfig_extract_fields, print_table 
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -138,7 +147,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
         created_at = dateutil.parser.parse(cluster['statuses']['created_at'])
         updated_at = dateutil.parser.parse(cluster['statuses']['updated_at'])
-        now = datetime.datetime.now(tz = created_at.tzinfo)
+        now = datetime.now(tz = created_at.tzinfo)
 
         row = [name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
 
@@ -566,6 +575,7 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--print-path', is_flag=True, help="Print path to saved kubeconfig")
+@click.option('--info', is_flag=True, help="Print info about kubeconfig")
 @click.option('--refresh', '--force', is_flag=True, help="Force refresh saved kubeconfig")
 @click.option('--nacl', is_flag=True, help="Use public key encryption on wire (require api support)")
 @click.option('--user', type=click.STRING, help="User")
@@ -573,7 +583,7 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 @click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, refresh, nacl, user, group, ttl, profile):
+def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, info, refresh, nacl, user, group, ttl, profile):
     """CLI command to fetch and optionally print the kubeconfig for a specified cluster."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -630,7 +640,13 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, refr
     if print_path:
         print(kubeconfig_path)
     else:
-        print(kubeconfig)
+        if info:
+            kubedata = kubeconfig_extract_fields(kubeconfig, cluster_name, user, group)
+            print_table(kubedata,
+                       [["Context", "context_name"], ["User", "user_name"], ["Cert Subject", "cn"], ["Expires At", "expires_at"],
+                       ["Cluster Name", "cluster_name"], ["Cluster Endpoint", "server_name"]])
+        else:
+            print(kubeconfig)
 
 
 def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
