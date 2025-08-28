@@ -705,17 +705,21 @@ def get_expiration_date(kubeconfig_str):
 
 def decode_parse_certificate(cert_str):
     """Parse base64 encoded certificate data and returns cert (X509) object"""
-    ca_cert = base64.b64decode(cert_str)
     try:
+        ca_cert = base64.b64decode(cert_str)
         cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, ca_cert)
         return cert
     except OpenSSL.crypto.Error as e:
         logging.info(f"ERROR: Can't parse base64 encoded certificate: {e}")
 
-def kubeconfig_extract_fields(kubeconfig, cluster_name, user, group):
+def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
     """Load YAML kubeconfig and extract fields"""
     kubeconfig_str = yaml.safe_load(kubeconfig)
     kubedata = list()
+
+    # Ensure YAML load returned a valid dict object
+    if not isinstance(kubeconfig_str, dict):
+        return kubedata
 
     for context in kubeconfig_str.get('contexts', []):
         data = dict()
