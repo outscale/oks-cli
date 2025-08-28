@@ -296,6 +296,20 @@ def test_cluster_kubeconfig_command(mock_request, add_default_profile):
     assert result.exit_code == 0
     assert 'kubeconfig' in result.output
 
+# Test the "cluster kubeconfig --info" command: verifies retrieving the kubeconfig and output as table
+@patch("oks_cli.utils.requests.request")
+def test_cluster_kubeconfig_info_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "kubeconfig", "-p", "test", "-c", "test", "--info"])
+    assert result.exit_code != 0
+    assert 'Something went wrong, could not parse kubeconfig' in result.output
+
 # Test the "cluster delete" command with JSON output
 @patch("oks_cli.utils.requests.request")
 def test_cluster_delete_command_json(mock_request, add_default_profile):
@@ -360,13 +374,12 @@ def test_cluster_kubectl_command(mock_request, mock_run, add_default_profile):
     runner = CliRunner()
     result = runner.invoke(cli, ["cluster", "-p", "test", "-c", "test", "kubectl", "get", "pods"])
     mock_run.assert_called()
-    
+
     args, kwargs = mock_run.call_args
 
     assert result.exit_code == 0
     assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
     assert args[0] == ["kubectl", "get", "pods"]
-
 
 # Test the "cluster create by one-click" command: verifies creating cluster interactively
 @patch("oks_cli.utils.os.fork")

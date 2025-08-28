@@ -21,7 +21,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_extract_fields, print_table 
+                   kubeconfig_parse_fields, print_table 
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -624,7 +624,9 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, info
         print(kubeconfig_path)
     else:
         if info:
-            kubedata = kubeconfig_extract_fields(kubeconfig, cluster_name, user, group)
+            kubedata = kubeconfig_parse_fields(kubeconfig, cluster_name, user, group)
+            if not len(kubedata):
+                raise SystemExit("Something went wrong, could not parse kubeconfig")
             print_table(kubedata,
                        [["Context", "context_name"], ["User", "user_name"], ["Cert Subject", "cn"], ["Expires At", "expires_at"],
                        ["Cluster Name", "cluster_name"], ["Cluster Endpoint", "server_name"]])
