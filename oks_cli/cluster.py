@@ -11,6 +11,7 @@ import dateutil.parser
 import human_readable
 import prettytable
 import logging
+import ipaddress
 
 from .utils import cluster_completer, do_request, print_output, find_project_id_by_name, find_cluster_id_by_name, get_cache, save_cache, detect_and_parse_input, verify_certificate, shell_completions, transform_tuple, profile_list, login_profile, cluster_create_in_background, ctx_update, set_cluster_id, get_cluster_id, get_project_id, get_template, get_cluster_name, format_changed_row, is_interesting_status, profile_completer, project_completer
 
@@ -230,6 +231,23 @@ def cluster_get_command(ctx, project_name, cluster_name, output, profile):
     print_output(data, output)
 
 
+def prepare_cluster_template(cluster_config):
+    cluster_template = get_template("cluster")
+
+    admin_whitelist = cluster_config.get("admin_whitelist") or []
+    if isinstance(admin_whitelist, str):
+        admin_whitelist = [admin_whitelist]
+
+    if admin_whitelist and admin_whitelist[0] == "my-ip":
+        cluster_config["admin_whitelist"] = cluster_template.get("admin_whitelist")
+    elif not admin_whitelist:
+        cluster_config["admin_whitelist"] = []
+    else:
+        cluster_config["admin_whitelist"] = admin_whitelist
+
+    cluster_template.update(cluster_config)
+    return cluster_template
+
 def _create_cluster(project_name, cluster_config, output):
     """Create a new cluster with interactive setup for missing profiles/projects."""
     profiles = profile_list()
@@ -270,8 +288,8 @@ def _create_cluster(project_name, cluster_config, output):
         project_name = project_name or "default"
         projects = do_request("GET", 'projects', params={"name": project_name})
 
-        cluster_template = get_template('cluster')
-        cluster_template.update(cluster_config)
+        cluster_template = prepare_cluster_template(cluster_config)
+        print_output(cluster_template, output)
 
         project_name_styled = click.style(project_name, bold=True)
         cluster_name_styled = click.style(cluster_template.get("name"), bold=True)
@@ -295,9 +313,7 @@ def _create_cluster(project_name, cluster_config, output):
     else:
         project_id = find_project_id_by_name(project_name)
 
-        cluster_template = get_template('cluster')
-        cluster_template.update(cluster_config)
-
+        cluster_template = prepare_cluster_template(cluster_config)
         do_request("GET", f'projects/{project_id}')
         cluster_template['project_id'] = project_id
 
@@ -401,8 +417,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
     if not dry_run:
         _create_cluster(project_name, cluster_config, output)
     else:
-        cluster_template = get_template("cluster")
-        cluster_template.update(cluster_config)
+        cluster_template = prepare_cluster_template(cluster_config)
         print_output(cluster_template, output)
 
 # UPDATE CLUSTER
