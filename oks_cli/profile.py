@@ -11,14 +11,14 @@ def profile():
 
 
 @profile.command('add', help="Add AK/SK or username/password new profile")
-@click.option('--profile-name', required=False, help="Name of profile, optional", type=click.STRING)
+@click.option('--profile-name', '--profile', required=False, help="Name of profile, optional", type=click.STRING)
 @click.option('--access-key', required=False, help="AK of profile", type=click.STRING)
 @click.option('--secret-key', required=False, help="SK of profile", type=click.STRING)
 @click.option('--username', required=False, help="Username", type=click.STRING)
 @click.option('--password', required=False, help="Password", type=click.STRING)
 @click.option('--region', required=True, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
-@click.option('--jwt', required=False, help="Enable jwt, by default is false", type=click.BOOL)
+@click.option('--jwt', help="Enable JWT, by default is false")
 def add_profile(profile_name, access_key, secret_key, username, password, region, endpoint, jwt):
     """Add a new profile with AK/SK or username/password authentication."""
     if not profile_name:
@@ -98,8 +98,8 @@ def update_profile(profile_name, region, endpoint, jwt, new_name, force):
     click.echo(msg)
 
 @profile.command('delete', help="Delete a profile by name")
-@click.option('--profile-name', required=True, help="Name of profile", type=click.STRING)
-@click.option('--force', is_flag=True, help="Force deletion without confirmation")
+@click.option('--profile-name', '--profile', required=True, help="Name of profile", type=click.STRING)
+@click.option('--force', '-f', is_flag=True, help="Force deletion without confirmation")
 def delete_profile(profile_name, force):
     """Delete a profile with confirmation."""
     profiles = profile_list()
@@ -113,7 +113,7 @@ def delete_profile(profile_name, force):
         click.echo(f"Profile {profile_name_bold} has been successfully deleted")
 
 @profile.command('list', help="List existing profiles")
-@click.option('-o', '--output', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, by default is wide")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, by default is wide")
 def list_profiles(output):
     """Display all configured profiles with their settings."""
     profiles = profile_list()
