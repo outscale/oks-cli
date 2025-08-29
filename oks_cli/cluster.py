@@ -80,13 +80,13 @@ def cluster_logout(ctx, profile):
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--deleted', '-x', is_flag=True, help="List deleted clusters")  # x pour "deleted" / "removed"
-@click.option('--plain', is_flag=True, help="Plain table format")
-@click.option('--msword', is_flag=True, help="Microsoft Word table format")
+@click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
+@click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
-def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, output, profile):
+def cluster_list(ctx, project_name, cluster_name, deleted, msword, plain, watch, output, profile):
     """Display clusters with optional filtering and real-time monitoring."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -558,7 +558,8 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--print-path', is_flag=True, help="Print path to saved kubeconfig")
-@click.option('--info', is_flag=True, help="Print info about kubeconfig")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table"]), default="yaml", help="Specify output format, default is yaml")
+@click.option('--wide', is_flag=True, help="Prints additional info, only supported for table output")
 @click.option('--refresh', '--force', is_flag=True, help="Force refresh saved kubeconfig")
 @click.option('--nacl', is_flag=True, help="Use public key encryption on wire (require api support)")
 @click.option('--user', type=click.STRING, help="User")
@@ -566,7 +567,7 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 @click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, info, refresh, nacl, user, group, ttl, profile):
+def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, output, wide, refresh, nacl, user, group, ttl, profile):
     """CLI command to fetch and optionally print the kubeconfig for a specified cluster."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -623,13 +624,17 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, info
     if print_path:
         print(kubeconfig_path)
     else:
-        if info:
+        if output == 'table':
             kubedata = kubeconfig_parse_fields(kubeconfig, cluster_name, user, group)
             if not len(kubedata):
                 raise SystemExit("Something went wrong, could not parse kubeconfig")
-            print_table(kubedata,
-                       [["Context", "context_name"], ["User", "user_name"], ["Cert Subject", "cn"], ["Expires At", "expires_at"],
-                       ["Cluster Name", "cluster_name"], ["Cluster Endpoint", "server_name"]])
+            fields = [["user", "user"], ["group", "group"], ["expiration date", "expires_at"]]
+            if wide:
+                fields.extend([["context:name", "context_name"], ["context:user", "ctx_user"],
+                               ["context:cluster", "cluster_name"], ["cluster endpoint", "server_name"]])
+            print_table(kubedata, fields)
+        elif output == 'json':
+            print(json.dumps(yaml.safe_load(kubeconfig)))
         else:
             print(kubeconfig)
 

@@ -1,5 +1,7 @@
 import click
-from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_expiration_date, ctx_update, login_profile, profile_completer, cluster_completer, project_completer
+from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_expiration_date, \
+                   ctx_update, login_profile, profile_completer, cluster_completer, project_completer, print_table
+
 import prettytable
 
 # DEFINE THE CACHE COMMAND GROUP
@@ -36,14 +38,8 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
 
     result = get_all_cache(project_id, cluster_id, "kubeconfig")
 
-    table = prettytable.PrettyTable()
-    table.field_names = ["user",  "group", "expiration date"]
-
-    if plain:
-        table.set_style(prettytable.PLAIN_COLUMNS)
-
-    if msword:
-        table.set_style(prettytable.MSWORD_FRIENDLY)
+    data = list()
+    fields = [["user", "user"],["group", "group"], ["expiration date", "expires_at"]]
 
     for element in result:
         kubeconfig = None
@@ -57,7 +53,11 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
         if kubeconfig:
             exp = get_expiration_date(kubeconfig)
             row = user, group, exp
+            data.append({"user": user, "group": group, "expires_at": exp})
 
-            table.add_row(row)
+    if plain:
+        style = prettytable.PLAIN_COLUMNS
+    if msword:
+        style = prettytable.MSWORD_FRIENDLY
 
-    click.echo(table)
+    print_table(data, fields, style=style)
