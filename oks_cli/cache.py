@@ -55,6 +55,7 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
             row = user, group, exp
             data.append({"user": user, "group": group, "expires_at": exp})
 
+    style = None
     if plain:
         style = prettytable.PLAIN_COLUMNS
     if msword:
