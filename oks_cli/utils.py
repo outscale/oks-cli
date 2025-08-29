@@ -717,7 +717,7 @@ def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
     kubeconfig_str = yaml.safe_load(kubeconfig)
     kubedata = list()
 
-    # Ensure YAML load returned a valid dict object
+    # Ensure loaded YAML returnes a valid dict object
     if not isinstance(kubeconfig_str, dict):
         return kubedata
 
@@ -731,22 +731,26 @@ def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
         for cluster in kubeconfig_str.get('clusters', []):
             if ctx_cluster == cluster.get('name', None):
                 cls_server = cluster.get('cluster').get('server')
-                if cluster_name:
-                    ctx_cluster = f"{ctx_cluster} ({cluster_name})"
-                data.update({"cluster_name": f"{ctx_cluster}",
-                                "server_name": cls_server})
+                if not cluster_name:
+                    cluster_name = ctx_cluster
+                data.update({"cluster_name": cluster_name, "server_name": cls_server})
                 break
 
         for user_name in kubeconfig_str.get('users', []):
             if ctx_user == user_name.get('name'):
                 cert_str = user_name.get('user').get('client-certificate-data')
-                expires_at = datetime.strptime(decode_parse_certificate(cert_str).get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
-                cn = []
-                for n in decode_parse_certificate(cert_str).get_subject().get_components():
-                    cn.append('='.join([n[0].decode('utf-8'), n[1].decode('utf-8')]))
-                data.update({"expires_at": expires_at, "user_name": ctx_user, "cn": "/".join(cn)})
+                cert_obj = decode_parse_certificate(cert_str)
+                expires_at = datetime.strptime(cert_obj.get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
+                cn = cert_obj.get_subject().get_components()
+                if not user:
+                    user = cn[0][1].decode('utf-8')
+                if not group and len(cn) > 1:
+                    group = cn[1][1].decode('utf-8')
+                data.update({"user": click.style(user, bold=True), "group": click.style(group, bold=True),
+                             "expires_at": expires_at, "ctx_user": ctx_user, "cn": f"CN={user}" + f"/O={group}" if group else ""})
                 break
         kubedata.append(data)
+
     return kubedata
 
 def retrieve_cp_sized(filepath, endpoint):

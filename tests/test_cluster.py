@@ -296,7 +296,7 @@ def test_cluster_kubeconfig_command(mock_request, add_default_profile):
     assert result.exit_code == 0
     assert 'kubeconfig' in result.output
 
-# Test the "cluster kubeconfig --info" command: verifies retrieving the kubeconfig and output as table
+# Test the "cluster kubeconfig --output table" command: verifies retrieving the kubeconfig and output as table
 @patch("oks_cli.utils.requests.request")
 def test_cluster_kubeconfig_info_command(mock_request, add_default_profile):
     mock_request.side_effect = [
@@ -306,7 +306,7 @@ def test_cluster_kubeconfig_info_command(mock_request, add_default_profile):
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["cluster", "kubeconfig", "-p", "test", "-c", "test", "--info"])
+    result = runner.invoke(cli, ["cluster", "kubeconfig", "-p", "test", "-c", "test", "--output", "table"])
     assert result.exit_code != 0
     assert 'Something went wrong, could not parse kubeconfig' in result.output
 
