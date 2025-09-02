@@ -716,7 +716,13 @@ def decode_parse_certificate(cert_str):
         logging.info(f"ERROR: Can't parse base64 encoded certificate: {e}")
 
 def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
-    """Load YAML kubeconfig and extract fields"""
+    """
+    Load YAML kubeconfig and extract fields
+    kubeconfig: Kubeconfig load file as string (YAML)
+    cluster_name: Name of the cluster kubeconfig is related to
+    user: user name of this kubeconfig (if set)
+    group: user group name of this kubeconfig (if set)
+    """
     kubeconfig_str = yaml.safe_load(kubeconfig)
     kubedata = list()
 
@@ -745,12 +751,10 @@ def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
                 cert_obj = decode_parse_certificate(cert_str)
                 expires_at = datetime.strptime(cert_obj.get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
                 cn = cert_obj.get_subject().get_components()
-                if not user:
-                    user = cn[0][1].decode('utf-8')
-                if not group and len(cn) > 1:
-                    group = cn[1][1].decode('utf-8')
+                cn_user = f"CN={cn[0][1].decode('utf-8')}"
+                cn_group = f"/O={cn[1][1].decode('utf-8')}" if len(cn) > 1 else ""
                 data.update({"user": click.style(user, bold=True), "group": click.style(group, bold=True),
-                             "expires_at": expires_at, "ctx_user": ctx_user, "cn": f"CN={user}" + f"/O={group}" if group else ""})
+                             "expires_at": expires_at, "ctx_user": ctx_user, "cn": f"{cn_user}{cn_group}"})
                 break
         kubedata.append(data)
 
