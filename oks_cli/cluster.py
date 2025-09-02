@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import dateutil.parser
 import human_readable
+import pathlib
 import prettytable
 import logging
 import yaml
@@ -21,7 +22,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table 
+                   kubeconfig_parse_fields, print_table, get_expiration_date
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -642,14 +643,24 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
         print(kubeconfig_path)
     else:
         if output == 'table':
-            kubedata = kubeconfig_parse_fields(kubeconfig, cluster_name, user, group)
-            if not len(kubedata):
-                raise SystemExit("Something went wrong, could not parse kubeconfig")
-            fields = [["user", "user"], ["group", "group"], ["expiration date", "expires_at"]]
-            if wide:
-                fields.extend([["context:name", "context_name"], ["context:user", "ctx_user"],
-                               ["context:cluster", "cluster_name"], ["cluster endpoint", "server_name"]])
-            print_table(kubedata, fields)
+            kubeconfig = pathlib.Path(kubeconfig_path).absolute()
+            if not user:
+                user = kubeconfig.parts[-3]
+            if not group:
+                group = kubeconfig.parts[-2]
+            if kubeconfig.is_file():
+                with kubeconfig.open() as f:
+                    kubeconfig_str = f.read()
+                kubedata = kubeconfig_parse_fields(kubeconfig_str, cluster_name, user, group)
+                if not len(kubedata):
+                    raise SystemExit("Something went wrong, could not parse kubeconfig")
+                fields = [["user", "user"], ["group", "group"], ["expiration date", "expires_at"]]
+                if wide:
+                    fields.extend([["Cert subject", "cn"], ["context:name", "context_name"], ["context:user", "ctx_user"],
+                                   ["context:cluster", "cluster_name"], ["cluster endpoint", "server_name"]])
+                print_table(kubedata, fields)
+            else:
+                raise SystemExit(f"Could not find {kubeconfig}")
         elif output == 'json':
             print(json.dumps(yaml.safe_load(kubeconfig)))
         else:
