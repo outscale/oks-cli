@@ -237,12 +237,15 @@ def prepare_cluster_template(cluster_config):
     if isinstance(admin_whitelist, str):
         admin_whitelist = [admin_whitelist]
 
-    if admin_whitelist and admin_whitelist[0] == "my-ip":
-        cluster_config["admin_whitelist"] = cluster_template.get("admin_whitelist")
-    elif not admin_whitelist:
-        cluster_config["admin_whitelist"] = []
-    else:
-        cluster_config["admin_whitelist"] = admin_whitelist
+    final_whitelist = []
+
+    for entry in admin_whitelist:
+        if entry == "my-ip":
+            final_whitelist.extend(cluster_template.get("admin_whitelist", []))
+        else:
+            final_whitelist.append(entry)
+
+    cluster_config["admin_whitelist"] = list(dict.fromkeys(final_whitelist))
 
     cluster_template.update(cluster_config)
     return cluster_template
