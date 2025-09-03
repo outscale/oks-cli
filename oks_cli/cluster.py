@@ -643,13 +643,13 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
         print(kubeconfig_path)
     else:
         if output == 'table':
-            kubeconfig = pathlib.Path(kubeconfig_path).absolute()
+            kubeconfig_path = pathlib.Path(kubeconfig_path).absolute()
             if not user:
-                user = kubeconfig.parts[-3]
+                user = kubeconfig_path.parts[-3]
             if not group:
-                group = kubeconfig.parts[-2]
-            if kubeconfig.is_file():
-                with kubeconfig.open() as f:
+                group = kubeconfig_path.parts[-2]
+            if kubeconfig_path.is_file():
+                with kubeconfig_path.open() as f:
                     kubeconfig_str = f.read()
                 kubedata = kubeconfig_parse_fields(kubeconfig_str, cluster_name, user, group)
                 if not len(kubedata):
@@ -660,7 +660,7 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
                                    ["context:cluster", "cluster_name"], ["cluster endpoint", "server_name"]])
                 print_table(kubedata, fields)
             else:
-                raise SystemExit(f"Could not find {kubeconfig}")
+                raise SystemExit(f"Could not find {kubeconfig_path}")
         elif output == 'json':
             print(json.dumps(yaml.safe_load(kubeconfig)))
         else:
