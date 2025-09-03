@@ -11,7 +11,6 @@ import dateutil.parser
 import human_readable
 import prettytable
 import logging
-import ipaddress
 
 from .utils import cluster_completer, do_request, print_output, find_project_id_by_name, find_cluster_id_by_name, get_cache, save_cache, detect_and_parse_input, verify_certificate, shell_completions, transform_tuple, profile_list, login_profile, cluster_create_in_background, ctx_update, set_cluster_id, get_cluster_id, get_project_id, get_template, get_cluster_name, format_changed_row, is_interesting_status, profile_completer, project_completer
 
@@ -326,7 +325,7 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--description', '-d', help="Description of the cluster")
-@click.option('--admin', '-a', help="Admin Whitelist")
+@click.option('--admin', '-a', help="Admin Whitelist ips. you can use 'my-ip' to automatically use your current IP.")
 @click.option('--version', '-v', shell_complete=shell_completions, help="Kubernetes version")
 @click.option('--cidr-pods', help="CIDR of pods")
 @click.option('--cidr-service', help='CIDR of services')
@@ -425,7 +424,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--project-name', '-p', required=False, help="Project name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name", shell_complete=cluster_completer)
 @click.option('--description', '-d', help="Description of the cluster")
-@click.option('--admin', '-a', help="Admin Whitelist")
+@click.option('--admin', '-a', help="Admin Whitelist ips. you can use 'my-ip' to automatically use your current IP.")
 @click.option('--version', '-v', shell_complete=shell_completions, help="Kubernetes version")
 @click.option('--tags', '-t', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
 @click.option('--enable-admission-plugins', help="List of admission plugins, separated by commas")
