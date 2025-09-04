@@ -724,7 +724,7 @@ def nodepool_list(ctx):
 @click.option('--nodepool-name', '-n', default="nodepool01", help="Nodepool Name")
 @click.option('--count', '-c', default=2, help="Count of nodes")
 @click.option('--type', 'vmtype', '-t', default="tinav6.c2r4p3", help="Type of VMs")
-@click.option('--zone', '-z', multiple=True, required=True, help="Provide zone(s)")
+@click.option('--zone', '-z', multiple=True, help="Provide zone(s)")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the Nodepool")
@@ -742,6 +742,9 @@ def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, 
         nodepool['spec']["nodeType"] = vmtype
         if zone:
             nodepool['spec']["zones"] = list(zone)
+
+    if not nodepool['spec']["zones"]:
+        raise click.BadArgumentUsage("Missing option '--zone' / '-z'.")
 
     if dry_run:
         print_output(nodepool, output)
