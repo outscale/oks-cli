@@ -230,6 +230,26 @@ def cluster_get_command(ctx, project_name, cluster_name, output, profile):
     print_output(data, output)
 
 
+def prepare_cluster_template(cluster_config):
+    cluster_template = get_template("cluster")
+
+    admin_whitelist = cluster_config.get("admin_whitelist") or []
+    if isinstance(admin_whitelist, str):
+        admin_whitelist = [admin_whitelist]
+
+    final_whitelist = []
+
+    for entry in admin_whitelist:
+        if entry == "my-ip":
+            final_whitelist.extend(cluster_template.get("admin_whitelist", []))
+        else:
+            final_whitelist.append(entry)
+
+    cluster_config["admin_whitelist"] = list(dict.fromkeys(final_whitelist))
+
+    cluster_template.update(cluster_config)
+    return cluster_template
+
 def _create_cluster(project_name, cluster_config, output):
     """Create a new cluster with interactive setup for missing profiles/projects."""
     profiles = profile_list()
@@ -270,8 +290,8 @@ def _create_cluster(project_name, cluster_config, output):
         project_name = project_name or "default"
         projects = do_request("GET", 'projects', params={"name": project_name})
 
-        cluster_template = get_template('cluster')
-        cluster_template.update(cluster_config)
+        cluster_template = prepare_cluster_template(cluster_config)
+        print_output(cluster_template, output)
 
         project_name_styled = click.style(project_name, bold=True)
         cluster_name_styled = click.style(cluster_template.get("name"), bold=True)
@@ -295,9 +315,7 @@ def _create_cluster(project_name, cluster_config, output):
     else:
         project_id = find_project_id_by_name(project_name)
 
-        cluster_template = get_template('cluster')
-        cluster_template.update(cluster_config)
-
+        cluster_template = prepare_cluster_template(cluster_config)
         do_request("GET", f'projects/{project_id}')
         cluster_template['project_id'] = project_id
 
@@ -310,7 +328,7 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--description', '-d', help="Description of the cluster")
-@click.option('--admin', '-a', help="Admin Whitelist")
+@click.option('--admin', '-a', help="Admin Whitelist ips. you can use 'my-ip' to automatically use your current IP.")
 @click.option('--version', '-v', shell_complete=shell_completions, help="Kubernetes version")
 @click.option('--cidr-pods', help="CIDR of pods")
 @click.option('--cidr-service', help='CIDR of services')
@@ -401,8 +419,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
     if not dry_run:
         _create_cluster(project_name, cluster_config, output)
     else:
-        cluster_template = get_template("cluster")
-        cluster_template.update(cluster_config)
+        cluster_template = prepare_cluster_template(cluster_config)
         print_output(cluster_template, output)
 
 # UPDATE CLUSTER
@@ -410,7 +427,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--project-name', '-p', required=False, help="Project name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name", shell_complete=cluster_completer)
 @click.option('--description', '-d', help="Description of the cluster")
-@click.option('--admin', '-a', help="Admin Whitelist")
+@click.option('--admin', '-a', help="Admin Whitelist ips. you can use 'my-ip' to automatically use your current IP.")
 @click.option('--version', '-v', shell_complete=shell_completions, help="Kubernetes version")
 @click.option('--tags', '-t', help="Comma-separated list of tags, example: 'key1=value1,key2=value2'")
 @click.option('--enable-admission-plugins', help="List of admission plugins, separated by commas")
