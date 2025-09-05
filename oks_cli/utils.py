@@ -170,14 +170,17 @@ def print_output(data, output_fromat):
 
     click.echo(output_data)
 
-def print_table(data, table_fields, align="l"):
+def print_table(data, table_fields, align="l", style=None):
     """Print API returned data as table
     data: list of dict containing data
     table_fields: List of 2 elements list. First element is the table field name, second element is the corresponding dict key in data
     align: Columns alignment (l,r,c)
+    style: Table format other style
     """
     table = prettytable.PrettyTable()
     table.align = align
+    if style and isinstance(style, prettytable.TableStyle):
+        table.set_style(style)
     fields = list()
     values = list()
 
@@ -697,16 +700,65 @@ def get_expiration_date(kubeconfig_str):
             logging.info("No client certificate data found for user.")
             continue
 
-        ca_cert = base64.b64decode(client_cert_data)
+        cert = decode_parse_certificate(client_cert_data)
+        not_after = cert.get_notAfter().decode('ascii')
+        not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
 
-        try:
-            cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, ca_cert)
-            not_after = cert.get_notAfter().decode('ascii')
-            not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
+        return not_after_date
 
-            return not_after_date
-        except OpenSSL.crypto.Error as e:
-             logging.info(f"ERROR: Invalid certificate data for cluster. Error: {e}")
+def decode_parse_certificate(cert_str):
+    """Parse base64 encoded certificate data and returns cert (X509) object"""
+    try:
+        ca_cert = base64.b64decode(cert_str)
+        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, ca_cert)
+        return cert
+    except OpenSSL.crypto.Error as e:
+        logging.info(f"ERROR: Can't parse base64 encoded certificate: {e}")
+
+def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
+    """
+    Load YAML kubeconfig and extract fields
+    kubeconfig: Kubeconfig load file as string (YAML)
+    cluster_name: Name of the cluster kubeconfig is related to
+    user: user name of this kubeconfig (if set)
+    group: user group name of this kubeconfig (if set)
+    """
+    kubeconfig_str = yaml.safe_load(kubeconfig)
+    kubedata = list()
+
+    # Ensure loaded YAML returnes a valid dict object
+    if not isinstance(kubeconfig_str, dict):
+        return kubedata
+
+    for context in kubeconfig_str.get('contexts', []):
+        data = dict()
+        ctx_cluster = context.get('context').get('cluster', None)
+        ctx_user = context.get('context').get('user', None)
+        ctx_name = context.get('name')
+        data.update({"context_name": ctx_name})
+
+        for cluster in kubeconfig_str.get('clusters', []):
+            if ctx_cluster == cluster.get('name', None):
+                cls_server = cluster.get('cluster').get('server')
+                if not cluster_name:
+                    cluster_name = ctx_cluster
+                data.update({"cluster_name": cluster_name, "server_name": cls_server})
+                break
+
+        for user_name in kubeconfig_str.get('users', []):
+            if ctx_user == user_name.get('name'):
+                cert_str = user_name.get('user').get('client-certificate-data')
+                cert_obj = decode_parse_certificate(cert_str)
+                expires_at = datetime.strptime(cert_obj.get_notAfter().decode('ascii'), '%Y%m%d%H%M%SZ')
+                cn = cert_obj.get_subject().get_components()
+                cn_user = f"CN={cn[0][1].decode('utf-8')}"
+                cn_group = f"/O={cn[1][1].decode('utf-8')}" if len(cn) > 1 else ""
+                data.update({"user": click.style(user, bold=True), "group": click.style(group, bold=True),
+                             "expires_at": expires_at, "ctx_user": ctx_user, "cn": f"{cn_user}{cn_group}"})
+                break
+        kubedata.append(data)
+
+    return kubedata
 
 def retrieve_cp_sized(filepath, endpoint):
     """Fetch control plane sizes from API and save to file."""
