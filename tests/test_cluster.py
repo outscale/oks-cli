@@ -5,6 +5,29 @@ from unittest.mock import patch, MagicMock
 import json 
 import yaml
 
+# Test the "cluster list" command: verifies region and profile are shown
+@patch("oks_cli.utils.requests.request")
+def test_cluster_list_command_with_region_and_profile(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda:
+                  {"ResponseContext": {},
+                   "Clusters": [
+                       {"id": "12345", "name": "test",
+                        "statuses": {"status": "ready",
+                                     "created_at": "2019-08-24T14:15:22Z",
+                                     "updated_at": "2019-08-24T14:15:22Z"}
+                        }
+                    ]
+                  }),
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "list", "-p", "test", "-c", "test"])
+    assert result.exit_code == 0
+    assert 'eu-west-2' in result.output
+    assert 'default' in result.output
+
 # Test the "cluster list" command: verifies listing clusters in a project
 @patch("oks_cli.utils.requests.request")
 def test_cluster_list_command(mock_request, add_default_profile):
