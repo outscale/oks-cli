@@ -4,6 +4,7 @@ import datetime
 import dateutil.parser
 import human_readable
 import prettytable
+from prettytable import TableStyle
 import os
 
 from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer
@@ -60,14 +61,15 @@ def project_logout(ctx, profile):
 @project.command('list', help="List all projects")
 @click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
 @click.option('--deleted', '-x', is_flag=True, help="List deleted projects")
-@click.option('--plain', is_flag=True, help="Plain table format")
-@click.option('--msword', is_flag=True, help="Microsoft Word table format")
+@click.option('--style', type=click.Choice(["msword", "plain"]), help="Optional table style format output")
+@click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
+@click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--uuid', is_flag=True, help="Show UUID")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
 @click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
-def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output, profile):
+def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, output, profile):
     """List projects with filtering, formatting, and live watch capabilities."""
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
@@ -95,11 +97,11 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
-    if plain or watch:
-        table.set_style(prettytable.PLAIN_COLUMNS)
+    if style == 'plain' or plain or watch:
+        table.set_style(TableStyle.PLAIN_COLUMNS)
 
-    if msword:
-        table.set_style(prettytable.MSWORD_FRIENDLY)
+    if style == 'mswoord' or msword:
+        table.set_style(TableStyle.MSWORD_FRIENDLY)
 
     def format_row(project):
         status = project.get('status')

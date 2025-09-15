@@ -18,6 +18,44 @@ def test_cluster_list_command(mock_request, add_default_profile):
     assert result.exit_code == 0
     assert '"name": "test"' in result.output
 
+# Test the "cluster list --plain" command: verifies deprecation warning is thrown
+@patch("oks_cli.utils.requests.request")
+def test_cluster_list_command_plain_deprecation(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {
+                                "ResponseContext": {},
+                                "Clusters": [
+                                    {"id": "12345", "name": "test",
+                                     "statuses": {"status": "ready",
+                                     "created_at": "2019-08-24T14:15:22Z",
+                                     "updated_at": "2019-08-24T14:15:22Z"}}]}),
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "list", "-p", "test", "-c", "test", '--plain'])
+    assert result.exit_code == 0
+    assert "DeprecationWarning: The options 'plain' is deprecated. use --style instead"
+
+# Test the "cluster list --msword" command: verifies deprecation warning is thrown
+@patch("oks_cli.utils.requests.request")
+def test_cluster_list_command_msword_deprecation(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {
+                                "ResponseContext": {},
+                                "Clusters": [
+                                    {"id": "12345", "name": "test",
+                                     "statuses": {"status": "ready",
+                                     "created_at": "2019-08-24T14:15:22Z",
+                                     "updated_at": "2019-08-24T14:15:22Z"}}]}),
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "list", "-p", "test", "-c", "test", '--msword'])
+    assert result.exit_code == 0
+    assert "DeprecationWarning: The options 'msword' is deprecated. use --style instead"
+
 # Test the "cluster list" command with all arguments: verifies that advanced filters
 @patch("oks_cli.utils.requests.request")
 def test_cluster_list_all_args(mock_request, add_default_profile):

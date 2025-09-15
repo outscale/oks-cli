@@ -3,6 +3,7 @@ from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name
                    ctx_update, login_profile, profile_completer, cluster_completer, project_completer, print_table
 
 import prettytable
+from prettytable import TableStyle
 
 # DEFINE THE CACHE COMMAND GROUP
 @click.group(help="Cache related commands.")
@@ -24,11 +25,12 @@ def delete_cache(force):
 @cache.command('kubeconfigs', help="List cached kubeconfigs")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
-@click.option('--plain', is_flag=True, help="Plain table format")
-@click.option('--msword', is_flag=True, help="Microsoft Word table format")
+@click.option('--style', type=click.Choice(["msword", "plain"]), help="Optional table style format output")
+@click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
+@click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
+def list_kubeconfigs(ctx, project_name, cluster_name, style, plain, msword, profile):
     """Display cached kubeconfigs with expiration dates in table format."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -57,8 +59,8 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
 
     style = None
     if plain:
-        style = prettytable.PLAIN_COLUMNS
+        style = TableStyle.PLAIN_COLUMNS
     if msword:
-        style = prettytable.MSWORD_FRIENDLY
+        style = TableStyle.MSWORD_FRIENDLY
 
     print_table(data, fields, style=style)
