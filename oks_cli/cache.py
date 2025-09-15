@@ -25,7 +25,7 @@ def delete_cache(force):
 @cache.command('kubeconfigs', help="List cached kubeconfigs")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
-@click.option('--style', type=click.Choice(["msword", "plain"]), help="Optional table style format output")
+@click.option('--style', multiple=False, type=click.Choice(["msword", "plain"]), help="Optional table style format output")
 @click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
@@ -57,10 +57,10 @@ def list_kubeconfigs(ctx, project_name, cluster_name, style, plain, msword, prof
             row = user, group, exp
             data.append({"user": user, "group": group, "expires_at": exp})
 
-    style = None
-    if plain:
+    if style == 'plain' or plain:
         style = TableStyle.PLAIN_COLUMNS
-    if msword:
+
+    if style == 'msword' or msword:
         style = TableStyle.MSWORD_FRIENDLY
 
     print_table(data, fields, style=style)

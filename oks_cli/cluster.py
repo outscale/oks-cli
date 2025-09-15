@@ -82,7 +82,7 @@ def cluster_logout(ctx, profile):
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--deleted', '-x', is_flag=True, help="List deleted clusters")  # x pour "deleted" / "removed"
-@click.option('--style', type=click.Choice(["msword", "plain"]), help="Optional table style format output")
+@click.option('--style', multiple=False, type=click.Choice(["msword", "plain"]), help="Optional table style format output")
 @click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")

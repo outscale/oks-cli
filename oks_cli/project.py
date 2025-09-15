@@ -61,7 +61,7 @@ def project_logout(ctx, profile):
 @project.command('list', help="List all projects")
 @click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
 @click.option('--deleted', '-x', is_flag=True, help="List deleted projects")
-@click.option('--style', type=click.Choice(["msword", "plain"]), help="Optional table style format output")
+@click.option('--style', multiple=False, type=click.Choice(["msword", "plain"]), help="Optional table style format output")
 @click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--uuid', is_flag=True, help="Show UUID")
@@ -100,7 +100,7 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
     if style == 'plain' or plain or watch:
         table.set_style(TableStyle.PLAIN_COLUMNS)
 
-    if style == 'mswoord' or msword:
+    if style == 'msword' or msword:
         table.set_style(TableStyle.MSWORD_FRIENDLY)
 
     def format_row(project):
