@@ -123,10 +123,10 @@ def cluster_list(ctx, project_name, cluster_name, deleted, style, plain, msword,
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
     if style == 'plain' or plain or watch:
-        style = TableStyle.PLAIN_COLUMNS
+        table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if style == 'msword' or msword:
-        style = TableStyle.MSWORD_FRIENDLY
+        table.set_style(TableStyle.MSWORD_FRIENDLY)
 
     def format_row(cluster):
         status = cluster['statuses']['status']
