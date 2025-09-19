@@ -19,7 +19,8 @@ def profile():
 @click.option('--region', required=True, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', help="Enable JWT, by default is false")
-def add_profile(profile_name, access_key, secret_key, username, password, region, endpoint, jwt):
+@click.option('--output', required=False, type=click.Choice(['json', 'yaml']), default='json', help="Default commands output format. Supported 'json,yaml', default 'json'")
+def add_profile(profile_name, access_key, secret_key, username, password, region, endpoint, jwt, output):
     """Add a new profile with AK/SK or username/password authentication."""
     if not profile_name:
         profile_name = "default"
@@ -55,7 +56,8 @@ def add_profile(profile_name, access_key, secret_key, username, password, region
 
     if jwt is not None:
         obj["jwt"] = jwt
-
+    if output:
+        obj["output"] = output
     set_profile(profile_name, obj)
 
     profile_name_styled = click.style(profile_name, bold=True)
@@ -68,7 +70,8 @@ def add_profile(profile_name, access_key, secret_key, username, password, region
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', required=False, help="Enable jwt, by default is false", type=click.BOOL)
 @click.option('--force', is_flag=True, help="Force update profile name without confirmation")
-def update_profile(profile_name, region, endpoint, jwt, new_name, force):
+@click.option('--output', required=False, type=click.Choice(['json', 'yaml']), help="Default commands output format. Supported 'json,yaml'")
+def update_profile(profile_name, region, endpoint, jwt, new_name, force, output):
     """Update configuration settings for an existing profile."""
     profiles = profile_list()
     if profile_name not in profiles:
@@ -84,6 +87,9 @@ def update_profile(profile_name, region, endpoint, jwt, new_name, force):
 
     if jwt is not None:
         profile["jwt"] = jwt
+
+    if output:
+        profile["output"] = output
 
     if new_name is not None:
         old_profile = click.style(profile_name, bold=True)
@@ -113,10 +119,11 @@ def delete_profile(profile_name, force):
         click.echo(f"Profile {profile_name_bold} has been successfully deleted")
 
 @profile.command('list', help="List existing profiles")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, by default is wide")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "text"]), help="Specify output format, by default is text")
 def list_profiles(output):
     """Display all configured profiles with their settings."""
     profiles = profile_list()
+    import warnings
 
     if not profiles:
         return click.echo("There are no profiles")
@@ -137,6 +144,7 @@ def list_profiles(output):
         account_type = profiles[key]["type"]
         region = profiles[key]["region_name"]
         jwt = profiles[key].get("jwt", False)
+        profile_output = profiles[key].get("output", click.style("Update profile", bold=True))
         # Remove credentials keys from profiles
         profiles[key].pop('access_key', None)
         profiles[key].pop('secret_key', None)
@@ -145,23 +153,27 @@ def list_profiles(output):
         # Add endpoint and JWT to dict
         profiles[key].update({'endpoint': endpoint})
         profiles[key].update({'jwt': jwt})
+        profiles[key].update({'output': profile_output})
 
         if output == 'wide' or output is None:
-            lines.append("Profile: {} Account type: {} Region: {} Endpoint: {} Enabled JWT auth: {}".format(
+            lines.append("Profile: {} Account type: {} Region: {} Endpoint: {} Enabled JWT auth: {} Default output: {}".format(
                          click.style(name, bold=True),
                          click.style(account_type, bold=True),
                          click.style(region, bold=True),
                          click.style(endpoint, bold=True),
-                         click.style(jwt, bold=True)))
+                         click.style(jwt, bold=True),
+                         click.style(profile_output, bold=True)))
         else:
-            lines.append({"name": name, "account_type": account_type, "region": region, "endpoint": endpoint, "jwt": jwt})
+            lines.append({"name": name, "account_type": account_type, "region": region, "endpoint": endpoint,
+                          "jwt": jwt, "output": profile_output})
     
     if output == "table":
         print_table(lines, [["Profile", "name"],
                             ["Account type", "account_type"],
                             ["Region", "region"],
                             ["Endpoint", "endpoint"],
-                            ["JWT enabled", "jwt"]])
+                            ["JWT enabled", "jwt"],
+                            ["Default output", "output"]])
     elif output in ["json", "yaml"]:
         print_output(profiles, output)
     else:
