@@ -119,7 +119,7 @@ def delete_profile(profile_name, force):
         click.echo(f"Profile {profile_name_bold} has been successfully deleted")
 
 @profile.command('list', help="List existing profiles")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "text"]), help="Specify output format, by default is text")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, by default is wide")
 def list_profiles(output):
     """Display all configured profiles with their settings."""
     profiles = profile_list()
