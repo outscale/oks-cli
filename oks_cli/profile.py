@@ -144,7 +144,9 @@ def list_profiles(output):
         account_type = profiles[key]["type"]
         region = profiles[key]["region_name"]
         jwt = profiles[key].get("jwt", False)
-        profile_output = profiles[key].get("output", click.style("Update profile", bold=True))
+        profile_output = profiles[key].get("output")
+        if not profile_output:
+            profile_output = click.style("Update profile", bold=True)
         # Remove credentials keys from profiles
         profiles[key].pop('access_key', None)
         profiles[key].pop('secret_key', None)
