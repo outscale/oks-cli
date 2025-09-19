@@ -6,7 +6,10 @@ import human_readable
 import prettytable
 import os
 
-from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer
+from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, \
+                   detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, \
+                   format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer, \
+                   format_row
 
 # DEIFNE THE PROJECT COMMAND GROUP
 @click.group(help="Project related commands.")
@@ -64,13 +67,13 @@ def project_logout(ctx, profile):
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--uuid', is_flag=True, help="Show UUID")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
-@click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o',  type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
 def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output, profile):
     """List projects with filtering, formatting, and live watch capabilities."""
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
-    login_profile(profile)
+    config = login_profile(profile)
 
     project_id = get_project_id()
     params = {}
@@ -82,8 +85,11 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 
     data = do_request("GET", 'projects', params=params)
 
-    if output:
+    if output in ["json", "yaml"]:
         print_output(data, output)
+        return
+    elif 'output' in config and output != "table":
+        print_output(data, config['output'])
         return
 
     field_names = ["NAME", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
@@ -101,39 +107,12 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
     if msword:
         table.set_style(prettytable.MSWORD_FRIENDLY)
 
-    def format_row(project):
-        status = project.get('status')
-        is_default = True if project.get('id') == project_id else False
-
-        if status == 'ready':
-            msg = click.style(status, fg='green')
-        elif status == 'failed' or status == 'deleted':
-            msg = click.style(status, fg='red')
-        elif status == 'deploying':
-            msg = click.style(status, fg='yellow')
-        else:
-            msg = status
-
-        name = click.style(project['name'], bold=True)
-        if is_default:
-            default = "*"
-        else:
-            default = ""
-
-        created_at = dateutil.parser.parse(project['created_at'])
-        updated_at = dateutil.parser.parse(project['updated_at'])
-        now = datetime.datetime.now(tz=created_at.tzinfo)
-
-        row = [name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
-        if uuid:
-            row.append(project['id'])
-
-        return row, status, project['name']
-
     initial_projects = {}
 
     for project in data:
-        row, _, name = format_row(project)
+        row, _, name = format_row(project, project.get('name'), project_id == project.get('id'))
+        if uuid:
+            row.append(project.get('id'))
         table.add_row(row)
         initial_projects[name] = project
 

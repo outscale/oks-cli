@@ -14,7 +14,8 @@ from datetime import datetime
 import OpenSSL
 import shutil
 import prettytable
-
+import dateutil.parser
+import human_readable
 import base64
 import sys
 
@@ -364,6 +365,34 @@ def login_profile(name):
         return profiles[name]
 
     return {}
+
+def format_row(data: dict, name: str, is_default: bool):
+    """Parse status and dates from a cluster of project object and returns elements"""
+
+    if not data.get('status'):
+        raise click.ClickException(f"Can't find 'status' in project/cluster data")
+
+    status = data.get('status')
+    if status == 'ready':
+        msg = click.style(status, fg='green')
+    elif status == 'failed' or status == 'deleted':
+        msg = click.style(status, fg='red')
+    elif status == 'deploying':
+        msg = click.style(status, fg='yellow')
+    else:
+        msg = status
+
+    if is_default:
+        default = "*"
+    else:
+        default = ""
+
+    created_at = dateutil.parser.parse(data['created_at'])
+    updated_at = dateutil.parser.parse(data['updated_at'])
+    now = datetime.now(tz=created_at.tzinfo)
+
+    row = [click.style(name, bold=True), human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
+    return row, status, name
 
 def profile_list():
     """Return all profiles as a dict, or empty if none."""
