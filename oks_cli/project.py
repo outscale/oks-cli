@@ -75,7 +75,9 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     config = login_profile(profile)
 
+    profile_name = os.getenv('OKS_PROFILE')
     project_id = get_project_id()
+
     params = {}
     if project_name:
         params['name'] = project_name
@@ -92,7 +94,7 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
         print_output(data, config['output'])
         return
 
-    field_names = ["NAME", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
+    field_names = ["PROJECT", "PROFILE", "REGION", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
     if uuid:
         field_names.append('UUID')
 
