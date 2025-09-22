@@ -92,6 +92,8 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
 
+    profile_name = os.getenv('OKS_PROFILE')
+    region_name = os.getenv('OKS_REGION')
     project_id = find_project_id_by_name(project_name)
     cluster_id = get_cluster_id()
 
@@ -103,7 +105,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     if deleted:
         params['deleted'] = True
 
-    field_names = ["NAME", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
+    field_names = ["CLUSTER", "PROFILE", "REGION", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
 
     data = do_request("GET", 'clusters', params=params)
 
@@ -150,7 +152,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
         updated_at = dateutil.parser.parse(cluster['statuses']['updated_at'])
         now = datetime.now(tz = created_at.tzinfo)
 
-        row = [name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
+        row = [name, profile_name, region_name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
 
         if output == "wide":
             row.insert(0, cluster['id'])
