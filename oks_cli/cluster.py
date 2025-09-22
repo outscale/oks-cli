@@ -132,6 +132,8 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
     for cluster in data:
         row, _, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+        row.insert(1, profile_name)
+        row.insert(2, region_name)
         if output == "wide":
             row.insert(0, cluster.get('id'))
             row.append(cluster.get('version'))

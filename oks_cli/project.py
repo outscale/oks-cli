@@ -113,6 +113,8 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 
     for project in data:
         row, _, name = format_row(project, project.get('name'), project_id == project.get('id'))
+        row.insert(1, profile_name)
+        row.insert(2, project.get('region'))
         if uuid:
             row.append(project.get('id'))
         table.add_row(row)
