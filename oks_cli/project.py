@@ -74,7 +74,9 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
 
+    profile_name = os.getenv('OKS_PROFILE')
     project_id = get_project_id()
+
     params = {}
     if project_name:
         params['name'] = project_name
@@ -88,7 +90,7 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
         print_output(data, output)
         return
 
-    field_names = ["NAME", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
+    field_names = ["PROJECT", "PROFILE", "REGION", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
     if uuid:
         field_names.append('UUID')
 
@@ -122,11 +124,12 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
         else:
             default = ""
 
+        region_name = project.get('region')
         created_at = dateutil.parser.parse(project['created_at'])
         updated_at = dateutil.parser.parse(project['updated_at'])
         now = datetime.datetime.now(tz=created_at.tzinfo)
 
-        row = [name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
+        row = [name, profile_name, region_name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
         if uuid:
             row.append(project['id'])
 
