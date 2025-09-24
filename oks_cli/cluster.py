@@ -642,7 +642,7 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig, user, group)
 
     if print_path:
-        print(kubeconfig_path)
+        click.echo(kubeconfig_path)
     else:
         if output == 'table':
             kubeconfig_path = pathlib.Path(kubeconfig_path).absolute()
@@ -664,9 +664,9 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
             else:
                 raise SystemExit(f"Could not find {kubeconfig_path}")
         elif output == 'json':
-            print(json.dumps(yaml.safe_load(kubeconfig)))
+            click.echo(json.dumps(yaml.safe_load(kubeconfig)))
         else:
-            print(kubeconfig)
+            click.echo(kubeconfig)
 
 
 def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
@@ -691,7 +691,7 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
             "GET", f'clusters/{cluster_id}/kubeconfig')['data']['kubeconfig']
 
         if not kubeconfig_raw:
-            print("Cannot get kubeconfig")
+            click.echo("Cannot get kubeconfig")
             raise SystemExit()
 
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
