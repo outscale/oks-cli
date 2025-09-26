@@ -361,6 +361,9 @@ def login_profile(name):
         if 'region_name' in profiles[name]:
             os.environ["OKS_REGION"] = profiles[name]['region_name']
 
+        if 'output' in profiles[name]:
+            os.environ["OKS_DEFAULT_OUTPUT"] = profiles[name]['output']
+
         return profiles[name]
 
     return {}
