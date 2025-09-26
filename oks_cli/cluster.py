@@ -22,7 +22,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, get_expiration_date
+                   kubeconfig_parse_fields, print_table, format_row
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -128,42 +128,17 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     if msword:
         table.set_style(prettytable.MSWORD_FRIENDLY)
 
-    def format_row(cluster):
-        status = cluster['statuses']['status']
-
-        is_default = True if cluster.get('id') == cluster_id else False
-
-        if status == 'ready':
-            msg = click.style(status, fg='green')
-        elif status == 'failed' or status == 'deleted':
-            msg = click.style(status, fg='red')
-        elif status == 'deploying':
-            msg = click.style(status, fg='yellow')
-        else:
-            msg = status
-
-        name = click.style(cluster['name'], bold=True)
-        if is_default:
-            default = "*"
-        else:
-            default = ""
-
-        created_at = dateutil.parser.parse(cluster['statuses']['created_at'])
-        updated_at = dateutil.parser.parse(cluster['statuses']['updated_at'])
-        now = datetime.now(tz = created_at.tzinfo)
-
-        row = [name, profile_name, region_name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
-
-        if output == "wide":
-            row.insert(0, cluster['id'])
-            row.append(cluster['version'])
-            row.append(cluster['control_planes'])
-
-        return row, status, cluster['name']
-
     initial_clusters = {}
+
     for cluster in data:
-        row, _, name = format_row(cluster)
+        row, _, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+        row.insert(1, profile_name)
+        row.insert(2, region_name)
+        if output == "wide":
+            row.insert(0, cluster.get('id'))
+            row.append(cluster.get('version'))
+            row.append(cluster.get('control_planes'))
+
         table.add_row(row)
         initial_clusters[name] = cluster
 
@@ -189,7 +164,9 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         deleted_cluster = cluster.copy()
                         deleted_cluster['statuses']['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_cluster)
+                        row, current_status, _ = format_row(deleted_cluster.get('statuses'), deleted_cluster.get('name'), cluster_id == deleted_cluster.get('id'))
+                        row.insert(1, profile_name)
+                        row.insert(2, region_name)
 
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
@@ -197,7 +174,9 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         del initial_clusters[name]
 
                 for cluster in data:
-                    row, current_status, name = format_row(cluster)
+                    row, current_status, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+                    row.insert(1, profile_name)
+                    row.insert(2, region_name)
 
                     if name not in initial_clusters:
                         new_table = format_changed_row(table, row)
