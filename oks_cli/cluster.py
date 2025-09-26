@@ -164,7 +164,9 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         deleted_cluster = cluster.copy()
                         deleted_cluster['statuses']['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_cluster)
+                        row, current_status, _ = format_row(deleted_cluster.get('statuses'), deleted_cluster.get('name'), cluster_id == deleted_cluster.get('id'))
+                        row.insert(1, profile_name)
+                        row.insert(2, region_name)
 
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
@@ -172,7 +174,9 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         del initial_clusters[name]
 
                 for cluster in data:
-                    row, current_status, name = format_row(cluster)
+                    row, current_status, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+                    row.insert(1, profile_name)
+                    row.insert(2, region_name)
 
                     if name not in initial_clusters:
                         new_table = format_changed_row(table, row)

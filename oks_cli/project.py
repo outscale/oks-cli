@@ -67,15 +67,16 @@ def project_logout(ctx, profile):
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--uuid', is_flag=True, help="Show UUID")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
-@click.option('--output', '-o',  type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
+@click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
 def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output, profile):
     """List projects with filtering, formatting, and live watch capabilities."""
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
-    config = login_profile(profile)
+    login_profile(profile)
 
     profile_name = os.getenv('OKS_PROFILE')
+    region_name = os.getenv('OKS_REGION')
     project_id = get_project_id()
 
     params = {}
@@ -87,11 +88,8 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 
     data = do_request("GET", 'projects', params=params)
 
-    if output in ["json", "yaml"]:
+    if output:
         print_output(data, output)
-        return
-    elif 'output' in config and output != "table":
-        print_output(data, config['output'])
         return
 
     field_names = ["PROJECT", "PROFILE", "REGION", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
@@ -114,14 +112,13 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
     for project in data:
         row, _, name = format_row(project, project.get('name'), project_id == project.get('id'))
         row.insert(1, profile_name)
-        row.insert(2, project.get('region'))
+        row.insert(2, region_name)
         if uuid:
             row.append(project.get('id'))
         table.add_row(row)
         initial_projects[name] = project
 
     click.echo(table)
-
 
     if watch:
         total_sleep = 0
@@ -142,15 +139,19 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
                         deleted_project = project.copy()
                         deleted_project['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_project)
-
+                        row, current_status, _ = format_row(deleted_project, deleted_project.get('name'), project_id == deleted_project.get('id'))
+                        row.insert(1, profile_name)
+                        row.insert(2, region_name)
                         new_table = format_changed_row(table, row)
+
                         click.echo(new_table)
 
                         del initial_projects[name]
 
                 for project in data:
-                    row, current_status, name = format_row(project)
+                    row, current_status, name = format_row(project, project.get('name'), project_id == project.get('id'))
+                    row.insert(1, profile_name)
+                    row.insert(2, region_name)
 
                     if name not in initial_projects:
                         new_table = format_changed_row(table, row)

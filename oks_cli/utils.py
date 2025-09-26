@@ -375,9 +375,9 @@ def format_row(data: dict, name: str, is_default: bool):
     status = data.get('status')
     if status == 'ready':
         msg = click.style(status, fg='green')
-    elif status == 'failed' or status == 'deleted':
+    elif status in ['failed', 'deleted']:
         msg = click.style(status, fg='red')
-    elif status == 'deploying':
+    elif status in ['deploying', 'deleting', 'pending']:
         msg = click.style(status, fg='yellow')
     else:
         msg = status
