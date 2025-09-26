@@ -476,3 +476,111 @@ def test_project_publicips_yaml(mock_request, add_default_profile):
     assert isinstance(data, list)
     assert data == []
 # END PROJECT PUBLICIPS COMMAND
+
+
+# Test the "project list" command with --watch option
+@patch("oks_cli.utils.requests.request")
+@patch("time.sleep")
+def test_project_list_watch_command(mock_sleep, mock_request, add_default_profile):
+    """Test the project list command with --watch option"""
+    
+    # First query for projects (initial state)
+    first_project_response = MagicMock(
+        status_code=200,
+        headers={},
+        json=lambda: {
+            "ResponseContext": {},
+            "Projects": [{
+                "id": "12345",
+                "name": "test-project",
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2023-01-01T00:00:00Z",
+                "status": "active"
+            }]
+        }
+    )
+    
+    # Second query for projects (new project appears)
+    second_project_response = MagicMock(
+        status_code=200,
+        headers={},
+        json=lambda: {
+            "ResponseContext": {},
+            "Projects": [
+                {
+                    "id": "12345",
+                    "name": "test-project",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                    "status": "active"
+                },
+                {
+                    "id": "67890",
+                    "name": "new-project",
+                    "created_at": "2023-01-01T00:01:00Z",
+                    "updated_at": "2023-01-01T00:01:00Z",
+                    "status": "creating"
+                }
+            ]
+        }
+    )
+    
+    # Third query for projects (status change)
+    third_project_response = MagicMock(
+        status_code=200,
+        headers={},
+        json=lambda: {
+            "ResponseContext": {},
+            "Projects": [
+                {
+                    "id": "12345",
+                    "name": "test-project",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                    "status": "active"
+                },
+                {
+                    "id": "67890",
+                    "name": "new-project",
+                    "created_at": "2023-01-01T00:01:00Z",
+                    "updated_at": "2023-01-01T00:02:00Z",
+                    "status": "active"
+                }
+            ]
+        }
+    )
+    
+    # Mock call configuration
+    mock_request.side_effect = [
+        first_project_response,
+        second_project_response,
+        third_project_response,
+        third_project_response,
+    ]
+    
+    # Simulate KeyboardInterrupt after a few iterations
+    def side_effect_sleep(duration):
+        if mock_sleep.call_count >= 3:
+            raise KeyboardInterrupt()
+        return None
+    
+    mock_sleep.side_effect = side_effect_sleep
+    
+    runner = CliRunner()
+    
+    # Launch command with --watch
+    result = runner.invoke(cli, [
+        "project", "list", 
+        "--watch"
+    ])
+    
+    # Checks
+    assert result.exit_code == 0
+    assert "test-project" in result.output
+    assert "Watch stopped." in result.output
+    
+    # Verify that sleep was called (indicates watch is working)
+    assert mock_sleep.called
+    
+    # Verify multiple API calls were made (at least 3 for watching)
+    assert mock_request.call_count >= 3

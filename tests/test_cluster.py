@@ -438,3 +438,92 @@ def test_cluster_create_by_one_click_command(mock_request,  mock_sleep, mock_for
     result = runner.invoke(cli, ["cluster", "create",  "-p", "default", "-c", "test"], input=input_data)
     assert result.exit_code == 0
 
+@patch("oks_cli.utils.requests.request")
+@patch("time.sleep")
+def test_cluster_list_watch_command(mock_sleep, mock_request, add_default_profile):
+    """Test the cluster list command with --watch option"""
+    
+    # Simulate successive API responses
+    initial_response = MagicMock(
+        status_code=200, 
+        headers={}, 
+        json=lambda: {
+            "ResponseContext": {}, 
+            "Projects": [{"id": "12345"}]
+        }
+    )
+    
+    # First query for clusters (initial state)
+    first_cluster_response = MagicMock(
+        status_code=200,
+        headers={},
+        json=lambda: {
+            "ResponseContext": {},
+            "Clusters": [{
+                "id": "12345",
+                "name": "test-cluster",
+                "statuses": {
+                    "status": "deploying",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z"
+                },
+                "version": "1.0",
+                "control_planes": 3
+            }]
+        }
+    )
+    
+    # Second query for clusters (status change)
+    second_cluster_response = MagicMock(
+        status_code=200,
+        headers={},
+        json=lambda: {
+            "ResponseContext": {},
+            "Clusters": [{
+                "id": "12345",
+                "name": "test-cluster",
+                "statuses": {
+                    "status": "ready",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:01:00Z"
+                },
+                "version": "1.0",
+                "control_planes": 3
+            }]
+        }
+    )
+    
+    # Mock call configuration
+    mock_request.side_effect = [
+        initial_response,
+        first_cluster_response,
+        second_cluster_response,
+        second_cluster_response,
+    ]
+    
+    # Simulate KeyboardInterrupt after a few iterations
+    def side_effect_sleep(duration):
+        if mock_sleep.call_count >= 3:
+            raise KeyboardInterrupt()
+        return None
+    
+    mock_sleep.side_effect = side_effect_sleep
+    
+    runner = CliRunner()
+    
+    result = runner.invoke(cli, [
+        "cluster", "list", 
+        "-p", "test", 
+        "-c", "test-cluster", 
+        "--watch"
+    ])
+    
+    # Checks
+    assert result.exit_code == 0
+    assert "test-cluster" in result.output
+    assert "Watch stopped." in result.output
+    
+    assert mock_sleep.called
+    
+    assert mock_request.call_count >= 3
+
