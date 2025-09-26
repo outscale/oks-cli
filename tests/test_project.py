@@ -5,6 +5,44 @@ import yaml
 import json 
 
 # START PROJECT LIST COMMAND
+# Test the "project list --plain" command: verifies deprecation warning
+@patch("oks_cli.utils.requests.request")
+def test_project_list_plain_deprecation_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {
+            "ResponseContext": {},
+            "Projects": [
+                {"id": "12345", "name": "test",
+                "created_at": "2019-08-24T14:15:22Z",
+                 "updated_at": "2019-08-24T14:15:22Z",
+                 "status": "ready",
+                 "region":"eu-west-2"}]})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "list", '--plain'])
+    assert result.exit_code == 0
+    assert "DeprecationWarning: The options 'plain' is deprecated. use --style instead"
+
+# Test the "project list --msword" command: verifies deprecation warning
+@patch("oks_cli.utils.requests.request")
+def test_project_list_msword_deprecation_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {
+            "ResponseContext": {},
+            "Projects": [
+                {"id": "12345", "name": "test",
+                "created_at": "2019-08-24T14:15:22Z",
+                 "updated_at": "2019-08-24T14:15:22Z",
+                 "status": "ready",
+                 "region":"eu-west-2"}]})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "list", '--msword'])
+    assert result.exit_code == 0
+    assert "DeprecationWarning: The options 'msword' is deprecated. use --style instead"
+
 # Test the "project list" command: verifies region and profile are shown
 @patch("oks_cli.utils.requests.request")
 def test_project_list_command_with_region_and_profile(mock_request, add_default_profile):
