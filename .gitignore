@@ -45,4 +45,4 @@ env.bak/
 venv.bak/
 
 # SonarQube
-.scannerwork/
+.scannerwork/site/
