@@ -268,8 +268,6 @@ def test_project_delete_json(mock_request, add_default_profile):
         "--profile", "default"
     ])
 
-    print(result.output)
-
     assert result.exit_code == 0
 
     # La sortie doit être du JSON valide

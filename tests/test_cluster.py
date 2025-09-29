@@ -23,7 +23,7 @@ def test_cluster_list_command_with_region_and_profile(mock_request, add_default_
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["cluster", "list", "-p", "test", "-c", "test"])
+    result = runner.invoke(cli, ["--profile", "default", "cluster", "list", "-p", "test", "-c", "test"])
     assert result.exit_code == 0
     assert 'eu-west-2' in result.output
     assert 'default' in result.output
@@ -37,7 +37,7 @@ def test_cluster_list_command(mock_request, add_default_profile):
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["cluster", "list", "-p", "test", "-c", "test", '-o', 'json'])
+    result = runner.invoke(cli, ["--profile", "default", "cluster", "list", "-p", "test", "-c", "test", '-o', 'json'])
     assert result.exit_code == 0
     assert '"name": "test"' in result.output
 
