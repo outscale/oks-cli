@@ -14,6 +14,7 @@ import prettytable
 import logging
 import yaml
 
+from prettytable import TableStyle
 from .utils import cluster_completer, do_request, print_output,                 \
                    find_project_id_by_name, find_cluster_id_by_name,            \
                    get_cache, save_cache, detect_and_parse_input,               \
@@ -123,7 +124,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
     if plain or watch:
-        table.set_style(prettytable.PLAIN_COLUMNS)
+        table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
         table.set_style(prettytable.MSWORD_FRIENDLY)
