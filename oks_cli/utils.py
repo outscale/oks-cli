@@ -35,6 +35,9 @@ class JSONClickException(click.ClickException):
     def show(self, file=None):
         click.echo(self.message, file=file)
 
+class _LiteralStr(str): pass
+
+yaml.add_representer(_LiteralStr, lambda dumper, data: dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|'))
 
 def find_response_object(data):
     """Extract the main object from the API response payload."""
@@ -158,12 +161,22 @@ def build_headers():
 
     return headers
 
+def _convert_multiline(obj):
+    """Recursively convert multiline strings"""
+    if isinstance(obj, dict):
+        return {k: _convert_multiline(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_convert_multiline(i) for i in obj]
+    if isinstance(obj, str) and '\n' in obj:
+        return _LiteralStr(obj)
+    return obj
+
 def print_output(data, output_fromat):
     """Print data in the specified format: JSON, YAML, or silent."""
     output_data = json.dumps(data, indent=4)
 
     if output_fromat == "yaml":
-        output_data = yaml.dump(data, sort_keys=False)
+        output_data = yaml.dump(_convert_multiline(data), sort_keys=False)
 
     elif output_fromat == "silent":
         return
