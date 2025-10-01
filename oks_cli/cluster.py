@@ -485,7 +485,23 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
         if len(admin) == 0:
             cluster_config['admin_whitelist'] = []
         else:
-            cluster_config['admin_whitelist'] = admin.split(',')
+            admin_list = admin.split(',')
+            resolved_ips = []
+            for ip in admin_list:
+                ip = ip.strip()
+                if ip == "my-ip":
+                    try:
+                        data = do_request("GET", "myip")
+                        if isinstance(data, dict) and "x_real_ip" in data:
+                            resolved_ip = data["x_real_ip"]
+                            resolved_ips.append(f"{resolved_ip}/32")
+                        else:
+                            raise click.ClickException(f"Unexpected response format from 'myip': {data}")
+                    except Exception as e:
+                        raise click.ClickException(f"Unable to resolve 'my-ip': {e}")
+                else:
+                    resolved_ips.append(ip)
+            cluster_config['admin_whitelist'] = resolved_ips
 
     if version is not None:
         cluster_config['version'] = version
