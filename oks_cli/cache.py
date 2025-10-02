@@ -2,7 +2,7 @@ import click
 from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_expiration_date, \
                    ctx_update, login_profile, profile_completer, cluster_completer, project_completer, print_table
 
-import prettytable
+from prettytable import TableStyle
 
 # DEFINE THE CACHE COMMAND GROUP
 @click.group(help="Cache related commands.")
@@ -57,8 +57,8 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
 
     style = None
     if plain:
-        style = prettytable.PLAIN_COLUMNS
+        style = TableStyle.PLAIN_COLUMNS
     if msword:
-        style = prettytable.MSWORD_FRIENDLY
+        style = TableStyle.MSWORD_FRIENDLY
 
     print_table(data, fields, style=style)

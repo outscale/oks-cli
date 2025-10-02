@@ -64,8 +64,7 @@ cli.add_command(quotas)
 def recursive_help(cmd, parent=None):
     """Recursively prints help for all commands and subcommands."""
     ctx = click.core.Context(cmd, info_name=cmd.name, parent=parent)
-    print(cmd.get_help(ctx))
-    print()
+    click.echo(cmd.get_help(ctx))
     commands = getattr(cmd, 'commands', {})
     for sub in commands.values():
         recursive_help(sub, ctx)
@@ -79,7 +78,7 @@ def fullhelp():
 def version():
     """Display the current CLI version."""
     import importlib.metadata
-    print(importlib.metadata.version(__package__))
+    click.echo(importlib.metadata.version(__package__))
 
 @cli.command("install-completion", help="Install shell completion scripts.")
 @click.option('--type', help="Shell, supported [bash,zsh]")

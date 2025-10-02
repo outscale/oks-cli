@@ -14,6 +14,7 @@ import prettytable
 import logging
 import yaml
 
+from prettytable import TableStyle
 from .utils import cluster_completer, do_request, print_output,                 \
                    find_project_id_by_name, find_cluster_id_by_name,            \
                    get_cache, save_cache, detect_and_parse_input,               \
@@ -123,7 +124,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
     if plain or watch:
-        table.set_style(prettytable.PLAIN_COLUMNS)
+        table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
         table.set_style(prettytable.MSWORD_FRIENDLY)
@@ -621,7 +622,7 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig, user, group)
 
     if print_path:
-        print(kubeconfig_path)
+        click.echo(kubeconfig_path)
     else:
         if output == 'table':
             kubeconfig_path = pathlib.Path(kubeconfig_path).absolute()
@@ -643,9 +644,9 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
             else:
                 raise SystemExit(f"Could not find {kubeconfig_path}")
         elif output == 'json':
-            print(json.dumps(yaml.safe_load(kubeconfig)))
+            click.echo(json.dumps(yaml.safe_load(kubeconfig)))
         else:
-            print(kubeconfig)
+            click.echo(kubeconfig)
 
 
 def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
@@ -670,7 +671,7 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
             "GET", f'clusters/{cluster_id}/kubeconfig')['data']['kubeconfig']
 
         if not kubeconfig_raw:
-            print("Cannot get kubeconfig")
+            click.echo("Cannot get kubeconfig")
             raise SystemExit()
 
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)

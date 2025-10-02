@@ -5,6 +5,7 @@ import dateutil.parser
 import human_readable
 import prettytable
 import os
+from prettytable import TableStyle
 
 from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, \
                    detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, \
@@ -102,7 +103,7 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
     if plain or watch:
-        table.set_style(prettytable.PLAIN_COLUMNS)
+        table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
         table.set_style(prettytable.MSWORD_FRIENDLY)
