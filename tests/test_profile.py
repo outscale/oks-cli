@@ -38,6 +38,18 @@ def test_profile_add_command():
     assert result.exit_code == 0
     assert "Profile default has been successfully added" in result.output
 
+def test_profile_add_output_command():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "add", "--region", "eu-west-2", "--access-key", "AK", "--secret-key", "SK", "--output", "yaml"])
+    assert result.exit_code == 0
+    assert "Profile default has been successfully added" in result.output
+
+def test_profile_add_output_faied_command():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["profile", "add", "--region", "eu-west-2", "--access-key", "AK", "--secret-key", "SK", "--output", "csv"])
+    assert result.exit_code != 0
+    assert "Invalid value for '--output'" in result.output
+
 def test_profile_update_command(add_default_profile):
     runner = CliRunner()
     result = runner.invoke(cli, ["profile", "update", "--profile-name", "default", "--region", "cloudgouv-eu-west-1"])
