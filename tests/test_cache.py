@@ -15,7 +15,7 @@ def test_cache_kubeconfigs_command(mock_request, add_default_profile):
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["cache", "kubeconfigs", "-p", "test", "-c", "test"])
+    result = runner.invoke(cli, ["--profile", "default", "cache", "kubeconfigs", "-p", "test", "-c", "test"])
     assert result.exit_code == 0
     assert '| user | group | expiration date |' in result.output
 

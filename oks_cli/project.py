@@ -7,7 +7,10 @@ import prettytable
 from prettytable import TableStyle
 import os
 
-from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer
+from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, \
+                   detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, \
+                   format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer, \
+                   format_row
 
 # DEIFNE THE PROJECT COMMAND GROUP
 @click.group(help="Project related commands.")
@@ -75,6 +78,7 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
     login_profile(profile)
 
     profile_name = os.getenv('OKS_PROFILE')
+    region_name = os.getenv('OKS_REGION')
     project_id = get_project_id()
 
     params = {}
@@ -105,45 +109,18 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
     if style == 'msword' or msword:
         table.set_style(TableStyle.MSWORD_FRIENDLY)
 
-    def format_row(project):
-        status = project.get('status')
-        is_default = True if project.get('id') == project_id else False
-
-        if status == 'ready':
-            msg = click.style(status, fg='green')
-        elif status == 'failed' or status == 'deleted':
-            msg = click.style(status, fg='red')
-        elif status == 'deploying':
-            msg = click.style(status, fg='yellow')
-        else:
-            msg = status
-
-        name = click.style(project['name'], bold=True)
-        if is_default:
-            default = "*"
-        else:
-            default = ""
-
-        region_name = project.get('region')
-        created_at = dateutil.parser.parse(project['created_at'])
-        updated_at = dateutil.parser.parse(project['updated_at'])
-        now = datetime.datetime.now(tz=created_at.tzinfo)
-
-        row = [name, profile_name, region_name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
-        if uuid:
-            row.append(project['id'])
-
-        return row, status, project['name']
-
     initial_projects = {}
 
     for project in data:
-        row, _, name = format_row(project)
+        row, _, name = format_row(project, project.get('name'), project_id == project.get('id'))
+        row.insert(1, profile_name)
+        row.insert(2, region_name)
+        if uuid:
+            row.append(project.get('id'))
         table.add_row(row)
         initial_projects[name] = project
 
     click.echo(table)
-
 
     if watch:
         total_sleep = 0
@@ -164,15 +141,19 @@ def project_list(ctx, project_name, deleted, style, plain, msword, uuid, watch, 
                         deleted_project = project.copy()
                         deleted_project['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_project)
-
+                        row, current_status, _ = format_row(deleted_project, deleted_project.get('name'), project_id == deleted_project.get('id'))
+                        row.insert(1, profile_name)
+                        row.insert(2, region_name)
                         new_table = format_changed_row(table, row)
+
                         click.echo(new_table)
 
                         del initial_projects[name]
 
                 for project in data:
-                    row, current_status, name = format_row(project)
+                    row, current_status, name = format_row(project, project.get('name'), project_id == project.get('id'))
+                    row.insert(1, profile_name)
+                    row.insert(2, region_name)
 
                     if name not in initial_projects:
                         new_table = format_changed_row(table, row)
