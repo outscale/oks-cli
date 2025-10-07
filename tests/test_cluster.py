@@ -66,6 +66,37 @@ def test_cluster_list_all_args(mock_request, add_default_profile):
     assert result.exit_code == 0
     assert "test-cluster" in result.output
 
+# Test the "cluster list" command with --all(-A) flag
+@patch("oks_cli.utils.requests.request")
+def test_cluster_list_all(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "test-project"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {
+            "ResponseContext": {},
+            "Clusters": [{
+                "id": "67890",
+                "project_id": "12345",
+                "name": "test-cluster",
+                "statuses": {
+                    "status": "ready",
+                    "created_at": "2019-08-24T14:15:22Z",
+                    "updated_at": "2019-08-24T14:15:22Z"
+                }
+            }]
+        }),
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "cluster", "list",
+        "-A",
+        "--profile", "default"
+    ])
+
+    assert result.exit_code == 0
+    assert "test-project" in result.output
+    assert "test-cluster" in result.output
+
 # Test the "cluster get" command: verifies fetching details of a specific cluster
 @patch("oks_cli.utils.requests.request")
 def test_cluster_get_command(mock_request, add_default_profile):
