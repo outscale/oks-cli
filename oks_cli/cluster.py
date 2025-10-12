@@ -11,6 +11,7 @@ import dateutil.parser
 import human_readable
 import pathlib
 import prettytable
+from prettytable import TableStyle
 import logging
 import yaml
 
@@ -82,14 +83,15 @@ def cluster_logout(ctx, profile):
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--deleted', '-x', is_flag=True, help="List deleted clusters")  # x pour "deleted" / "removed"
-@click.option('--plain', is_flag=True, help="Plain table format")
-@click.option('--msword', is_flag=True, help="Microsoft Word table format")
+@click.option('--style', multiple=False, type=click.Choice(["msword", "plain"]), help="Optional table style format output")
+@click.option('--plain', is_flag=True, help="Plain table format", deprecated="Use --style instead")
+@click.option('--msword', is_flag=True, help="Microsoft Word table format", deprecated="Use --style instead")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
 @click.option('--profile', help="Configuration profile to use")
 @click.option('--all', '-A', is_flag=True, help="List clusters from all projects")
 @click.pass_context
-def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, output, profile, all):
+def cluster_list(ctx, project_name, cluster_name, deleted, style, plain, msword, watch, output, profile, all):
     """Display clusters with optional filtering and real-time monitoring."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -136,11 +138,11 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
-    if plain or watch:
+    if style == 'plain' or plain or watch:
         table.set_style(TableStyle.PLAIN_COLUMNS)
 
-    if msword:
-        table.set_style(prettytable.MSWORD_FRIENDLY)
+    if style == 'msword' or msword:
+        table.set_style(TableStyle.MSWORD_FRIENDLY)
 
     initial_clusters = {}
 
