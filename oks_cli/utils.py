@@ -262,6 +262,12 @@ def find_project_id_by_name(project_name):
 
     return project_id
 
+def get_project_by_id(project_id):
+    """Return project by its ID"""
+    if not project_id:
+        return None
+    return do_request("GET", f"projects/{project_id}")
+
 def find_cluster_id_by_name(project_id, cluster_name):
     """Retrieve the cluster ID by name within a given project, or use the default cluster if none is provided."""
     if not cluster_name:
@@ -1003,6 +1009,33 @@ def get_template(type):
         os.chmod(TEMPLATE_PATH, 0o600)
 
     return template
+
+def get_netpeering_request_template():
+    """As NetPeeringRequest template is not yet supported by OKS API, we generate one from scratch as json document"""
+    netpeering_request_template = dict()
+    netpeering_request_template.update({
+        "apiVersion": "oks.dev/v1beta",
+        "kind": "NetPeeringRequest",
+        "metadata": {"name": None},
+        "spec": {
+            "accepterNetId": None,
+            "accepterOwnerId": None
+        }
+    })
+    return netpeering_request_template
+
+def get_netpeering_acceptance_template():
+    """As NetPeeringAcceptenace template is not yet supported by OKS API, we generate one from scratch as json document"""
+    netpeering_acceptance_template = dict()
+    netpeering_acceptance_template.update({
+        "apiVersion": "oks.dev/v1beta",
+        "kind": "NetPeeringAcceptance",
+        "metadata": {"name": None},
+        "spec": {
+            "netPeeringId": None
+        }
+    })
+    return netpeering_acceptance_template
 
 def ctx_update(ctx, project_name=None, cluster_name=None, profile=None, overwrite=True):
     """Update context with project, cluster, and profile; optionally prevent overwrites."""
