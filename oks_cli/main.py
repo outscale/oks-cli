@@ -8,6 +8,7 @@ from .cluster import cluster
 from .profile import profile
 from .cache import cache
 from .quotas import quotas
+from .netpeering import netpeering
 
 from .utils import ctx_update, install_completions, profile_completer, cluster_completer, project_completer
 
@@ -60,6 +61,7 @@ cli.add_command(cluster)
 cli.add_command(profile)
 cli.add_command(cache)
 cli.add_command(quotas)
+cli.add_command(netpeering)
 
 def recursive_help(cmd, parent=None):
     """Recursively prints help for all commands and subcommands."""
