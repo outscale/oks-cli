@@ -1,18 +1,13 @@
 import click
 import json
 import time
-from datetime import datetime
 import ipaddress
 import uuid
 from subprocess import CalledProcessError
 
-from .utils import cluster_completer, do_request, print_output,                 \
-                   find_project_id_by_name, find_cluster_id_by_name,            \
-                   profile_list, login_profile, cluster_create_in_background,   \
-                   ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
-                   get_template, get_cluster_name, format_changed_row,          \
-                   is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, get_project_by_id,     \
+from .utils import cluster_completer, print_output, find_project_id_by_name, \
+                   find_cluster_id_by_name, login_profile, ctx_update,       \
+                   profile_completer, project_completer, get_project_by_id,  \
                    get_netpeering_acceptance_template, get_netpeering_request_template
 from .cluster import _run_kubectl
 
@@ -35,12 +30,13 @@ def netpeering(ctx, profile, project_name, cluster_name, user, group):
     ctx.obj['group'] = group
 
 
-@netpeering.command('list', help="List NetPeering between 2 projects")
+@netpeering.command('list', help="List NetPeering from a project/cluster")
 @click.option('--status', default="active", type=click.Choice(["active", "deleted", "all"]), help="List NetPeering with this status, default 'active'. Not supported with wide output")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
 @click.pass_context
 def netpeering_list(ctx, status, output):
     """List netpeering in the specified cluster"""
+
     cmd = ['get', 'netpeerings']
     if output == 'wide':
         cmd.extend(['-o', output])
@@ -48,7 +44,7 @@ def netpeering_list(ctx, status, output):
         cmd.extend(['-o', 'json'])
 
     netpeerings = _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
-                                          cmd, capture=True).stdout.decode('utf-8')
+                               cmd, capture=True).stdout.decode('utf-8')
     if output == 'wide':
         click.echo(netpeerings)
         return
@@ -64,8 +60,17 @@ def netpeering_list(ctx, status, output):
     print_output(netpeerings, output)
     return
 
+@netpeering.command('get', help="Get information about a NetPeering")
+@click.option('--netpeering-id', required=True, type=click.STRING, help="NetPeering to get information from")
+@click.option('--output', '-o', default='json', required=False, type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
+@click.pass_context
+def netpeering_get(ctx, netpeering_id, output):
+    """Retrieve information about a NetPeering"""
 
-@netpeering.command('delete')
+    _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
+                 ['get', 'netpeering', netpeering_id, '-o', output])
+
+@netpeering.command('delete', help="Delete a NetPeering from a project/cluster")
 @click.option('--netpeering-id', required=True, type=click.STRING, help="NetPeering to remove")
 @click.option('--dry-run', required=False, is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
