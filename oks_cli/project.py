@@ -106,7 +106,7 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
         table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
-        table.set_style(prettytable.MSWORD_FRIENDLY)
+        table.set_style(TableStyle.MSWORD_FRIENDLY)
 
     initial_projects = {}
 
