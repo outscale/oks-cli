@@ -140,7 +140,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
         table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
-        table.set_style(prettytable.MSWORD_FRIENDLY)
+        table.set_style(TableStyle.MSWORD_FRIENDLY)
 
     initial_clusters = {}
 
@@ -681,7 +681,7 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
             click.echo(kubeconfig)
 
 
-def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
+def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=False):
     """Run a kubectl command using the cached kubeconfig for the specified cluster, refreshing it if needed."""
     # @TODO: check expiration in get_cache() code, etc
     kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig', user, group)
@@ -714,9 +714,9 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
     cmd += list(args)
     logging.info("running %s", cmd)
     if not input:
-        return subprocess.run(cmd, env = env)
+        return subprocess.run(cmd, env = env, capture_output=capture)
     else:
-        return subprocess.run(cmd, input=input, text=True, env = env)
+        return subprocess.run(cmd, input=input, text=True, env = env, capture_output=capture)
 
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
