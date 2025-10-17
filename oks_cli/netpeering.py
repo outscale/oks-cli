@@ -29,7 +29,6 @@ def netpeering(ctx, profile, project_name, cluster_name, user, group):
     ctx.obj['user'] = user
     ctx.obj['group'] = group
 
-
 @netpeering.command('list', help="List NetPeering from a project/cluster")
 @click.option('--status', default="active", type=click.Choice(["active", "deleted", "all"]), help="List NetPeering with this status, default 'active'. Not supported with wide output")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
@@ -60,6 +59,7 @@ def netpeering_list(ctx, status, output):
     print_output(netpeerings, output)
     return
 
+
 @netpeering.command('get', help="Get information about a NetPeering")
 @click.option('--netpeering-id', required=True, type=click.STRING, help="NetPeering to get information from")
 @click.option('--output', '-o', default='json', required=False, type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
@@ -69,6 +69,7 @@ def netpeering_get(ctx, netpeering_id, output):
 
     _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
                  ['get', 'netpeering', netpeering_id, '-o', output])
+
 
 @netpeering.command('delete', help="Delete a NetPeering from a project/cluster")
 @click.option('--netpeering-id', required=True, type=click.STRING, help="NetPeering to remove")
@@ -92,6 +93,7 @@ def netpeering_delete(ctx, netpeering_id, dry_run, force):
         except CalledProcessError as e:
             raise click.ClickException(f"Could not delete NetPeering {netpeering_id}: {e}")
 
+
 def _gather_info(project: str=None, cluster: str=None) -> dict:
     """
         Gather information about project and cluster required to create a NetPeering
@@ -112,6 +114,7 @@ def _gather_info(project: str=None, cluster: str=None) -> dict:
     info.update({'cluster_id': find_cluster_id_by_name(info.get('project_id'), info.get('cluster_name'))})
     info.update({'project_cidr': get_project_by_id(info.get('project_id')).get('cidr')})
     return info
+
 
 def _check_existing_netpeering(source: dict=None, target: dict=None, user: str=None, group: str=None) -> bool:
     """
