@@ -247,6 +247,23 @@ def handle_jwt_error(err, method, path, args, kwargs):
     except Exception:
         return None
 
+
+# TODO: Introduce `find_project_by_name` into `find_project_by_id` method for merging
+def find_project_by_name(project_name):
+    """Retrieve the project data by name or use the default project if no name is provided."""
+    if not project_name:
+        project_id = get_project_id()
+        if not project_id:
+            raise click.BadParameter("--project-name must be specified, or a default project must be set")
+    else:
+        data = do_request("GET", 'projects', params={"name": project_name})
+        if len(data) != 1:
+            errors = {"Error": f"{len(data)} projects found by name: {project_name}"}
+            raise JSONClickException(json.dumps(errors))
+        project = data.pop()
+
+    return project
+
 def find_project_id_by_name(project_name):
     """Retrieve the project ID by name or use the default project if no name is provided."""
     if not project_name:
@@ -261,12 +278,6 @@ def find_project_id_by_name(project_name):
         project_id = data.pop()['id']
 
     return project_id
-
-def get_project_by_id(project_id):
-    """Return project by its ID"""
-    if not project_id:
-        return None
-    return do_request("GET", f"projects/{project_id}")
 
 def find_cluster_id_by_name(project_id, cluster_name):
     """Retrieve the cluster ID by name within a given project, or use the default cluster if none is provided."""

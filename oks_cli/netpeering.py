@@ -7,7 +7,7 @@ from subprocess import CalledProcessError
 
 from .utils import cluster_completer, print_output, find_project_id_by_name, \
                    find_cluster_id_by_name, login_profile, ctx_update,       \
-                   profile_completer, project_completer, get_project_by_id,  \
+                   profile_completer, project_completer, find_project_by_name,  \
                    get_netpeering_acceptance_template, get_netpeering_request_template
 from .cluster import _run_kubectl
 
@@ -31,7 +31,7 @@ def netpeering(ctx, profile, project_name, cluster_name, user, group):
 
 @netpeering.command('list', help="List NetPeering from a project/cluster")
 @click.option('--status', default="active", type=click.Choice(["active", "deleted", "all"]), help="List NetPeering with this status, default 'active'. Not supported with wide output")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
 @click.pass_context
 def netpeering_list(ctx, status, output):
     """List netpeering in the specified cluster"""
@@ -68,7 +68,7 @@ def netpeering_get(ctx, netpeering_id, output):
     """Retrieve information about a NetPeering"""
 
     _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
-                 ['get', 'netpeering', netpeering_id, '-o', output])
+                   ['get', 'netpeering', netpeering_id, '-o', output])
 
 
 @netpeering.command('delete', help="Delete a NetPeering from a project/cluster")
@@ -109,14 +109,14 @@ def _gather_info(project: str=None, cluster: str=None) -> dict:
     if not project or not cluster:
         raise click.ClickException("Project and cluster name are required")
 
+    project_data = find_project_by_name(project)
     info.update({'cluster_name': cluster, 'project_name': project})
-    info.update({'project_id': find_project_id_by_name(info.get('project_name'))})
+    info.update({'project_id': project_data.get('id'), 'project_cidr': project_data.get('cidr')})
     info.update({'cluster_id': find_cluster_id_by_name(info.get('project_id'), info.get('cluster_name'))})
-    info.update({'project_cidr': get_project_by_id(info.get('project_id')).get('cidr')})
     return info
 
 
-def _check_existing_netpeering(source: dict=None, target: dict=None, user: str=None, group: str=None) -> bool:
+def _netpeering_exists(source: dict=None, target: dict=None, user: str=None, group: str=None) -> bool:
     """
         Checks if an existing NetPeering already exists between similar project/cluster id
     """
@@ -127,13 +127,13 @@ def _check_existing_netpeering(source: dict=None, target: dict=None, user: str=N
                                             capture=True).stdout.decode('utf-8'))
         for item in netpeerings.get('items'):
             status = item.get('status')
-            if status.get('accepterNetId') == target.get('network_id')   and \
+            if status.get('accepterNetId')   == target.get('network_id') and \
                status.get('accepterOwnerId') == target.get('account_id') and \
-               status.get('sourceNetId') == source.get('network_id')     and \
-               status.get('sourceOwnerId') == source.get('account_id')   and \
+               status.get('sourceNetId')     == source.get('network_id') and \
+               status.get('sourceOwnerId')   == source.get('account_id') and \
                status.get('netPeeringState') == 'active':
-               
-               click.echo(f"A NetPeering {item.get('spec').get('netPeeringId')} already exists between projects {source.get('project_name')} and {target.get('project_name')}. Aborting!",
+
+               click.echo(f"A NetPeering {item.get('spec').get('netPeeringId')} already exists between projects {source.get('project_name')} and {target.get('project_name')}.",
                             err=True)
                return True
     except CalledProcessError as e:
@@ -169,14 +169,14 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
     target_cidr = ipaddress.ip_network(target.get('project_cidr'))
 
     if source_cidr.overlaps(target_cidr) or target_cidr.overlaps(source_cidr):
-        click.BadParameter(f"Source network {source.get('project_cidr')} and target network {target.get('project_cidr')} overlap, you can't create netpeering")
+        raise click.ClickException(f"Source network {source.get('project_cidr')} and target network {target.get('project_cidr')} overlap, you can't create netpeering. Aborted!")
 
     # We need VPC ID (network_id) and Account id from target project
     source_nodepool = json.loads(_run_kubectl(source.get('project_id'), source.get('cluster_id'), user, group,
                                  ['get', 'nodepool', '-o', 'json'], capture=True).stdout.decode('utf-8'))
 
     target_nodepool = json.loads(_run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
-                                            ['get', 'nodepool', '-o', 'json'], capture=True).stdout.decode('utf-8'))
+                                 ['get', 'nodepool', '-o', 'json'], capture=True).stdout.decode('utf-8'))
 
     source.update({'network_id': source_nodepool['items'][0]['metadata']['labels']['oks.network_id'],
                    'account_id': source_nodepool['items'][0]['metadata']['labels']['oks.account-id']})
@@ -184,8 +184,8 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
     target.update({'network_id': target_nodepool['items'][0]['metadata']['labels']['oks.network_id'],
                    'account_id': target_nodepool['items'][0]['metadata']['labels']['oks.account-id']})
 
-    if _check_existing_netpeering(source=source, target=target, user=user, group=user):
-        return
+    if _netpeering_exists(source=source, target=target, user=user, group=user):
+        raise click.ClickException("Aborting!")
 
     # Generate name
     if not netpeering_name:
