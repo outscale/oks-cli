@@ -714,9 +714,9 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=
     cmd += list(args)
     logging.info("running %s", cmd)
     if not input:
-        return subprocess.run(cmd, env = env, capture_output=capture)
+        return subprocess.run(cmd, env=env, capture_output=capture)
     else:
-        return subprocess.run(cmd, input=input, text=True, env = env, capture_output=capture)
+        return subprocess.run(cmd, input=input, text=True, env=env, capture_output=capture)
 
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
