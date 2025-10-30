@@ -5,11 +5,12 @@ import ipaddress
 import uuid
 from subprocess import CalledProcessError
 
-from .utils import cluster_completer, print_output, find_project_id_by_name, \
-                   find_cluster_id_by_name, login_profile, ctx_update,       \
-                   profile_completer, project_completer, find_project_by_name,  \
+from .utils import cluster_completer, print_output, find_project_id_by_name,   \
+                   find_cluster_id_by_name, login_profile, ctx_update,         \
+                   profile_completer, project_completer, find_project_by_name, \
                    get_netpeering_acceptance_template, get_netpeering_request_template
 from .cluster import _run_kubectl
+from json import JSONDecodeError
 
 @click.group(help="NetPeering related commands.")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
@@ -44,6 +45,7 @@ def netpeering_list(ctx, status, output):
 
     netpeerings = _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
                                cmd, capture=True).stdout.decode('utf-8')
+
     if output == 'wide':
         click.echo(netpeerings)
         return
@@ -121,10 +123,14 @@ def _netpeering_exists(source: dict=None, target: dict=None, user: str=None, gro
         Checks if an existing NetPeering already exists between similar project/cluster id
     """
     # We check if there's not already a NetPeering available and active
+    if not source or not target:
+        raise AttributeError("source and target must be passesd as dict")
+
     try:
         netpeerings = json.loads(_run_kubectl(source.get('project_id'), source.get('cluster_id'), user, group,
                                             ['get', 'netpeering', '-o', 'json'],
                                             capture=True).stdout.decode('utf-8'))
+
         for item in netpeerings.get('items'):
             status = item.get('status')
             if status.get('accepterNetId')   == target.get('network_id') and \
@@ -133,9 +139,8 @@ def _netpeering_exists(source: dict=None, target: dict=None, user: str=None, gro
                status.get('sourceOwnerId')   == source.get('account_id') and \
                status.get('netPeeringState') == 'active':
 
-               click.echo(f"A NetPeering {item.get('spec').get('netPeeringId')} already exists between projects {source.get('project_name')} and {target.get('project_name')}.",
-                            err=True)
-               return True
+                return True
+
     except CalledProcessError as e:
         raise click.ClickException(f"Cannot list NetPeerings: {e}")
 
@@ -184,8 +189,8 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
     target.update({'network_id': target_nodepool['items'][0]['metadata']['labels']['oks.network_id'],
                    'account_id': target_nodepool['items'][0]['metadata']['labels']['oks.account-id']})
 
-    if _netpeering_exists(source=source, target=target, user=user, group=user):
-        raise click.ClickException("Aborting!")
+    if _netpeering_exists(source=source, target=target, user=user, group=group):
+        raise click.ClickException(f"A NetPeering already exists between projects {source.get('project_name')} and {target.get('project_name')}. Aborting!")
 
     # Generate name
     if not netpeering_name:
@@ -211,14 +216,13 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
     # For security, we wait a bit for the status to be availabe
     time.sleep(3)
 
-    try:
-        netpeering_request_cmd = _run_kubectl(source.get('project_id'), source.get('cluster_id'), user, group,
-                                        ['get', 'netpeeringrequests', '-o', 'json', f"{netpeering_request_name}"],
-                                        capture=True)
-        netpeering_request_cmd.check_returncode()
-        netpeering_request = json.loads(netpeering_request_cmd.stdout.decode('utf-8'))
-    except CalledProcessError as e:
-        raise click.ClickException(f"Cannot create NetPeeringRequest: {e}\n{netpeering_request_cmd.stderr}")
+    netpeering_request_cmd = _run_kubectl(source.get('project_id'), source.get('cluster_id'), user, group,
+                                    ['get', 'netpeeringrequests', '-o', 'json', f"{netpeering_request_name}"],
+                                    capture=True)
+    if netpeering_request_cmd.returncode:
+        raise click.ClickException(f"Cannot create NetPeeringRequest: {netpeering_request_cmd.stderr}")
+
+    netpeering_request = json.loads(netpeering_request_cmd.stdout.decode('utf-8'))
 
     # Create NetPeeringAcceptance
     netpeering_acceptance = get_netpeering_acceptance_template()

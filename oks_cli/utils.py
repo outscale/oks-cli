@@ -759,28 +759,33 @@ def verify_certificate(kubeconfig_str):
     """Check if the kubeconfig client certificate is still valid."""
     not_after_date = get_expiration_date(kubeconfig_str)
 
-    if not_after_date < datetime.now():
-        return False
-    else:
-        return True
+    if not_after_date:
+        if not_after_date < datetime.now():
+            return False
+        else:
+            return True
+    return False
 
 def get_expiration_date(kubeconfig_str):
     """Extract and return the client certificate expiration date."""
     kubeconfig = yaml.safe_load(kubeconfig_str)
 
-    for user_entry in kubeconfig.get('users', []):
-        user_details = user_entry['user']
-        client_cert_data = user_details.get('client-certificate-data')
+    try:
+        for user_entry in kubeconfig.get('users', []):
+            user_details = user_entry['user']
+            client_cert_data = user_details.get('client-certificate-data')
 
-        if not client_cert_data:
-            logging.info("No client certificate data found for user.")
-            continue
+            if not client_cert_data:
+                logging.info("No client certificate data found for user.")
+                continue
 
-        cert = decode_parse_certificate(client_cert_data)
-        not_after = cert.get_notAfter().decode('ascii')
-        not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
+            cert = decode_parse_certificate(client_cert_data)
+            not_after = cert.get_notAfter().decode('ascii')
+            not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
 
-        return not_after_date
+            return not_after_date
+    except AttributeError as e:
+        logging.warning(f"Error occured reading kubeconfig: {e}")
 
 def decode_parse_certificate(cert_str):
     """Parse base64 encoded certificate data and returns cert (X509) object"""
