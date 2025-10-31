@@ -75,6 +75,8 @@ def find_response_object(data):
             return response["Snapshots"]
         elif key == "PublicIps":
             return response["PublicIps"]
+        elif key == "IP":
+            return response["IP"]
 
     raise click.ClickException("The API response format is incorrect.")
 
