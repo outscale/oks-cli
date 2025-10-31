@@ -255,7 +255,7 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
             netpeering_status = json.loads(get_netpeering_cmd.stdout.decode('utf-8')).get('status').get('netPeeringState')
         
 
-        # print_output(json.loads(get_netpeering_cmd.stdout.decode('utf-8')), output)
+        print_output(json.loads(get_netpeering_cmd.stdout.decode('utf-8')), output)
         click.echo(f"NetPeering {netpeering_id} successfully created and {netpeering_status} between projects '{source.get('project_name')}' and '{target.get('project_name')}'")
 
     else:

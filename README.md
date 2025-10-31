@@ -185,7 +185,6 @@ oks-cli/
 │   ├── project.py
 │   ├── quotas.py
 │   └── utils.py
-├── setup.py
 ├── setup.py              # Packaging configuration
 ├── requirements.txt      # Dependencies
 └── README.md             # Project documentation
