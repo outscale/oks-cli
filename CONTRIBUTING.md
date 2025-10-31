@@ -86,6 +86,7 @@ oks-cli/
 │   ├── cache.py          # Cache management functionality
 │   ├── cluster.py        # Cluster operations
 │   ├── main.py           # Main CLI entry point
+│   ├── netpeering.py     # NetPeering management
 │   ├── profile.py        # Profile management
 │   ├── project.py        # Project configuration
 │   ├── quotas.py         # Quota management

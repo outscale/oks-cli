@@ -238,6 +238,23 @@ def handle_jwt_error(err, method, path, args, kwargs):
     except Exception:
         return None
 
+
+# TODO: Introduce `find_project_by_name` into `find_project_by_id` method for merging
+def find_project_by_name(project_name):
+    """Retrieve the project data by name or use the default project if no name is provided."""
+    if not project_name:
+        project_id = get_project_id()
+        if not project_id:
+            raise click.BadParameter("--project-name must be specified, or a default project must be set")
+    else:
+        data = do_request("GET", 'projects', params={"name": project_name})
+        if len(data) != 1:
+            errors = {"Error": f"{len(data)} projects found by name: {project_name}"}
+            raise JSONClickException(json.dumps(errors))
+        project = data.pop()
+
+    return project
+
 def find_project_id_by_name(project_name):
     """Retrieve the project ID by name or use the default project if no name is provided."""
     if not project_name:
@@ -727,28 +744,33 @@ def verify_certificate(kubeconfig_str):
     """Check if the kubeconfig client certificate is still valid."""
     not_after_date = get_expiration_date(kubeconfig_str)
 
-    if not_after_date < datetime.now():
-        return False
-    else:
-        return True
+    if not_after_date:
+        if not_after_date < datetime.now():
+            return False
+        else:
+            return True
+    return False
 
 def get_expiration_date(kubeconfig_str):
     """Extract and return the client certificate expiration date."""
     kubeconfig = yaml.safe_load(kubeconfig_str)
 
-    for user_entry in kubeconfig.get('users', []):
-        user_details = user_entry['user']
-        client_cert_data = user_details.get('client-certificate-data')
+    try:
+        for user_entry in kubeconfig.get('users', []):
+            user_details = user_entry['user']
+            client_cert_data = user_details.get('client-certificate-data')
 
-        if not client_cert_data:
-            logging.info("No client certificate data found for user.")
-            continue
+            if not client_cert_data:
+                logging.info("No client certificate data found for user.")
+                continue
 
-        cert = decode_parse_certificate(client_cert_data)
-        not_after = cert.get_notAfter().decode('ascii')
-        not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
+            cert = decode_parse_certificate(client_cert_data)
+            not_after = cert.get_notAfter().decode('ascii')
+            not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
 
-        return not_after_date
+            return not_after_date
+    except AttributeError as e:
+        logging.warning(f"Error occured reading kubeconfig: {e}")
 
 def decode_parse_certificate(cert_str):
     """Parse base64 encoded certificate data and returns cert (X509) object"""
@@ -988,6 +1010,33 @@ def get_template(type):
         os.chmod(TEMPLATE_PATH, 0o600)
 
     return template
+
+def get_netpeering_request_template():
+    """As NetPeeringRequest template is not yet supported by OKS API, we generate one from scratch as json document"""
+    netpeering_request_template = dict()
+    netpeering_request_template.update({
+        "apiVersion": "oks.dev/v1beta",
+        "kind": "NetPeeringRequest",
+        "metadata": {"name": None},
+        "spec": {
+            "accepterNetId": None,
+            "accepterOwnerId": None
+        }
+    })
+    return netpeering_request_template
+
+def get_netpeering_acceptance_template():
+    """As NetPeeringAcceptenace template is not yet supported by OKS API, we generate one from scratch as json document"""
+    netpeering_acceptance_template = dict()
+    netpeering_acceptance_template.update({
+        "apiVersion": "oks.dev/v1beta",
+        "kind": "NetPeeringAcceptance",
+        "metadata": {"name": None},
+        "spec": {
+            "netPeeringId": None
+        }
+    })
+    return netpeering_acceptance_template
 
 def ctx_update(ctx, project_name=None, cluster_name=None, profile=None, overwrite=True):
     """Update context with project, cluster, and profile; optionally prevent overwrites."""
