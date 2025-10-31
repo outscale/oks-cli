@@ -180,10 +180,12 @@ oks-cli/
 │   ├── cache.py
 │   ├── cluster.py
 │   ├── main.py
+│   ├── netpeering.py
 │   ├── profile.py
 │   ├── project.py
 │   ├── quotas.py
 │   └── utils.py
+├── setup.py
 ├── setup.py              # Packaging configuration
 ├── requirements.txt      # Dependencies
 └── README.md             # Project documentation

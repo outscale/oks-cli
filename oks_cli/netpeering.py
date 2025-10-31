@@ -235,29 +235,27 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
         raise click.ClickException(f"NetPeeringAcceptance is in wrong state: {netpeering_request_status}")
 
     if auto_approve or \
-        click.confirm(f"Are you sure you want to create NetPeering between projects {source.get('project_name')} and {target.get('project_name')}?", abort=True):
+        click.confirm(f"Are you sure you want to create NetPeering between projects {source.get('project_name')} and {target.get('project_name')}?", abort=False):
 
-        try:
-            _run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
-                        ["create", "-f", "-"], input=json.dumps(netpeering_acceptance))
+        netpeering_acceptance_cmd = _run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
+                                                ["create", "-f", "-"], input=json.dumps(netpeering_acceptance),
+                                                capture=True)
+        if netpeering_acceptance_cmd.returncode:
+            raise click.ClickException(f"Could not create NetPeeringAcceptance object {netpeering_id}: {netpeering_acceptance_cmd.stderr}")
 
-        except CalledProcessError as e:
-            raise click.ClickException(f"Could not create netpeering {netpeering_id}: {e}")
-        
         # Wait a bit for NetPeering to appear
-        netpeering_status = 'pending-acceptance' #json.loads(netpeering.stdout.decode('utf-8')).get('status').get('netPeeringState')
+        netpeering_status = 'pending-acceptance'
         while netpeering_status != 'active':
             time.sleep(3)
-            try:
-                netpeering = _run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
-                                    ['get', 'netpeering', netpeering_id, '-o', 'json'],
-                                    capture=True)
-                netpeering.check_returncode()
-                netpeering_status = json.loads(netpeering.stdout.decode('utf-8')).get('status').get('netPeeringState')
-            except CalledProcessError as e:
-                raise click.ClickException(f"Could not get NetPeering {netpeering_id} status: {e}")
+            get_netpeering_cmd = _run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
+                                                ['get', 'netpeering', '-o', 'json', netpeering_id,],
+                                                capture=True)
+            if get_netpeering_cmd.returncode:
+                raise click.ClickException(f"Could not get NetPeering {netpeering_id} status: {get_netpeering_cmd.stderr}")
+            netpeering_status = json.loads(get_netpeering_cmd.stdout.decode('utf-8')).get('status').get('netPeeringState')
+        
 
-        print_output(json.loads(netpeering.stdout.decode('utf-8')), output)
+        # print_output(json.loads(get_netpeering_cmd.stdout.decode('utf-8')), output)
         click.echo(f"NetPeering {netpeering_id} successfully created and {netpeering_status} between projects '{source.get('project_name')}' and '{target.get('project_name')}'")
 
     else:
