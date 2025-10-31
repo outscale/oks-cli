@@ -1633,7 +1633,7 @@ def test_netpeering_create_netpeering_checkstate_ok_command(mock_request, mock_r
             stderr = ""
         )
     ]
-    # mock_sleep.return_value = None
+    mock_sleep.return_value = None
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "mynetpeering-name", "--auto-approve",
