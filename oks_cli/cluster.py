@@ -14,6 +14,7 @@ import prettytable
 import logging
 import yaml
 
+from prettytable import TableStyle
 from .utils import cluster_completer, do_request, print_output,                 \
                    find_project_id_by_name, find_cluster_id_by_name,            \
                    get_cache, save_cache, detect_and_parse_input,               \
@@ -22,7 +23,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, get_expiration_date
+                   kubeconfig_parse_fields, print_table, format_row
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -86,19 +87,22 @@ def cluster_logout(ctx, profile):
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
 @click.option('--profile', help="Configuration profile to use")
+@click.option('--all', '-A', is_flag=True, help="List clusters from all projects")
 @click.pass_context
-def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, output, profile):
+def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, output, profile, all):
     """Display clusters with optional filtering and real-time monitoring."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
 
     profile_name = os.getenv('OKS_PROFILE')
     region_name = os.getenv('OKS_REGION')
-    project_id = find_project_id_by_name(project_name)
-    cluster_id = get_cluster_id()
-
     params = {}
-    params['project_id'] = project_id
+
+    if not all:
+        project_id = find_project_id_by_name(project_name)
+        params['project_id'] = project_id
+
+    cluster_id = get_cluster_id()
 
     if cluster_name:
         params['name'] = cluster_name
@@ -107,7 +111,17 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
     field_names = ["CLUSTER", "PROFILE", "REGION", "CREATED", "UPDATED", "STATUS", "DEFAULT"]
 
-    data = do_request("GET", 'clusters', params=params)
+    if all:
+        field_names.insert(0, "PROJECT")
+
+        projects = {project["id"]: project for project in do_request("GET", "projects")}
+        data = do_request("GET", "clusters/all", params=params)
+
+        for cluster in data:
+            project = projects.get(cluster.get("project_id"))
+            cluster["project_name"] = project.get("name")
+    else:
+        data = do_request("GET", "clusters", params=params)
 
     if output == "wide":
         field_names.insert(0, "ID")
@@ -123,49 +137,27 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     table._min_width = {"CREATED": 13, "UPDATED": 13, "STATUS": 10}
 
     if plain or watch:
-        table.set_style(prettytable.PLAIN_COLUMNS)
+        table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
         table.set_style(prettytable.MSWORD_FRIENDLY)
 
-    def format_row(cluster):
-        status = cluster['statuses']['status']
-
-        is_default = True if cluster.get('id') == cluster_id else False
-
-        if status == 'ready':
-            msg = click.style(status, fg='green')
-        elif status == 'failed' or status == 'deleted':
-            msg = click.style(status, fg='red')
-        elif status == 'deploying':
-            msg = click.style(status, fg='yellow')
-        else:
-            msg = status
-
-        name = click.style(cluster['name'], bold=True)
-        if is_default:
-            default = "*"
-        else:
-            default = ""
-
-        created_at = dateutil.parser.parse(cluster['statuses']['created_at'])
-        updated_at = dateutil.parser.parse(cluster['statuses']['updated_at'])
-        now = datetime.now(tz = created_at.tzinfo)
-
-        row = [name, profile_name, region_name, human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
-
-        if output == "wide":
-            row.insert(0, cluster['id'])
-            row.append(cluster['version'])
-            row.append(cluster['control_planes'])
-
-        return row, status, cluster['name']
-
     initial_clusters = {}
+
     for cluster in data:
-        row, _, name = format_row(cluster)
+        row, _, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+        row.insert(1, profile_name)
+        row.insert(2, region_name)
+        if all:
+            project_name = click.style(cluster.get("project_name"), bold=True)
+            row.insert(0, project_name)
+        if output == "wide":
+            row.insert(0, cluster.get('id'))
+            row.append(cluster.get('version'))
+            row.append(cluster.get('control_planes'))
+
         table.add_row(row)
-        initial_clusters[name] = cluster
+        initial_clusters[cluster.get("id")] = cluster
 
     click.echo(table)
 
@@ -177,46 +169,66 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                 total_sleep += 2
 
                 try:
-                    data = do_request("GET", 'clusters', params=params)
+                    if all:
+                        projects = {project["id"]: project for project in do_request("GET", "projects")}
+                        data = do_request("GET", "clusters/all", params=params)
+
+                        for cluster in data:
+                            project = projects.get(cluster.get("project_id"))
+                            cluster["project_name"] = project.get("name")
+                    else:
+                        data = do_request("GET", 'clusters', params=params)
                 except click.ClickException as err:
                     click.echo(f"Error during watch: {err}")
                     continue
 
-                current_cluster_names = {cluster['name'] for cluster in data}
+                current_cluster_ids = {cluster.get('id') for cluster in data}
 
-                for name, cluster in list(initial_clusters.items()):
-                    if name not in current_cluster_names:
+                for id, cluster in list(initial_clusters.items()):
+                    if id not in current_cluster_ids:
                         deleted_cluster = cluster.copy()
                         deleted_cluster['statuses']['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_cluster)
+                        row, current_status, _ = format_row(deleted_cluster.get('statuses'), deleted_cluster.get('name'), cluster_id == deleted_cluster.get('id'))
+                        row.insert(1, profile_name)
+                        row.insert(2, region_name)
+                        if all:
+                            project_name = click.style(cluster.get("project_name"), bold=True)
+                            row.insert(0, project_name)
 
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
                         
-                        del initial_clusters[name]
+                        del initial_clusters[id]
 
                 for cluster in data:
-                    row, current_status, name = format_row(cluster)
+                    row, current_status, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+                    row.insert(1, profile_name)
+                    row.insert(2, region_name)
+                    if all:
+                        project_name = click.style(cluster.get("project_name"), bold=True)
+                        row.insert(0, project_name)
 
-                    if name not in initial_clusters:
+                    cl_id = cluster.get('id')
+
+                    if cl_id not in initial_clusters:
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
-                        initial_clusters[name] = cluster
+                        initial_clusters[cl_id] = cluster
                         continue
 
-                    stored_cluster = initial_clusters[name]
+                    stored_cluster = initial_clusters[cl_id]
                     cluster_status = stored_cluster.get('statuses').get('status')
                     if cluster_status != current_status:
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
-                        initial_clusters[name] = cluster
+                        initial_clusters[cl_id] = cluster
                         continue
 
                     if total_sleep % 10 == 0 and is_interesting_status(current_status):
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
-                        initial_clusters[name] = cluster
+                        initial_clusters[cl_id] = cluster
 
         except KeyboardInterrupt:
             click.echo("\nWatch stopped.")
@@ -473,7 +485,23 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
         if len(admin) == 0:
             cluster_config['admin_whitelist'] = []
         else:
-            cluster_config['admin_whitelist'] = admin.split(',')
+            admin_list = admin.split(',')
+            resolved_ips = []
+            for ip in admin_list:
+                ip = ip.strip()
+                if ip == "my-ip":
+                    try:
+                        data = do_request("GET", "myip")
+                        if isinstance(data, dict) and "x_real_ip" in data:
+                            resolved_ip = data["x_real_ip"]
+                            resolved_ips.append(f"{resolved_ip}/32")
+                        else:
+                            raise click.ClickException(f"Unexpected response format from 'myip': {data}")
+                    except Exception as e:
+                        raise click.ClickException(f"Unable to resolve 'my-ip': {e}")
+                else:
+                    resolved_ips.append(ip)
+            cluster_config['admin_whitelist'] = resolved_ips
 
     if version is not None:
         cluster_config['version'] = version
@@ -642,7 +670,7 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig, user, group)
 
     if print_path:
-        print(kubeconfig_path)
+        click.echo(kubeconfig_path)
     else:
         if output == 'table':
             kubeconfig_path = pathlib.Path(kubeconfig_path).absolute()
@@ -664,9 +692,9 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
             else:
                 raise SystemExit(f"Could not find {kubeconfig_path}")
         elif output == 'json':
-            print(json.dumps(yaml.safe_load(kubeconfig)))
+            click.echo(json.dumps(yaml.safe_load(kubeconfig)))
         else:
-            print(kubeconfig)
+            click.echo(kubeconfig)
 
 
 def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
@@ -691,7 +719,7 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
             "GET", f'clusters/{cluster_id}/kubeconfig')['data']['kubeconfig']
 
         if not kubeconfig_raw:
-            print("Cannot get kubeconfig")
+            click.echo("Cannot get kubeconfig")
             raise SystemExit()
 
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)

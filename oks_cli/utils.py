@@ -14,7 +14,8 @@ from datetime import datetime
 import OpenSSL
 import shutil
 import prettytable
-
+import dateutil.parser
+import human_readable
 import base64
 import sys
 
@@ -35,6 +36,9 @@ class JSONClickException(click.ClickException):
     def show(self, file=None):
         click.echo(self.message, file=file)
 
+class _LiteralStr(str): pass
+
+yaml.add_representer(_LiteralStr, lambda dumper, data: dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|'))
 
 def find_response_object(data):
     """Extract the main object from the API response payload."""
@@ -71,6 +75,8 @@ def find_response_object(data):
             return response["Snapshots"]
         elif key == "PublicIps":
             return response["PublicIps"]
+        elif key == "IP":
+            return response["IP"]
 
     raise click.ClickException("The API response format is incorrect.")
 
@@ -158,12 +164,22 @@ def build_headers():
 
     return headers
 
+def _convert_multiline(obj):
+    """Recursively convert multiline strings"""
+    if isinstance(obj, dict):
+        return {k: _convert_multiline(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_convert_multiline(i) for i in obj]
+    if isinstance(obj, str) and '\n' in obj:
+        return _LiteralStr(obj)
+    return obj
+
 def print_output(data, output_fromat):
     """Print data in the specified format: JSON, YAML, or silent."""
     output_data = json.dumps(data, indent=4)
 
     if output_fromat == "yaml":
-        output_data = yaml.dump(data, sort_keys=False)
+        output_data = yaml.dump(_convert_multiline(data), sort_keys=False)
 
     elif output_fromat == "silent":
         return
@@ -367,6 +383,34 @@ def login_profile(name):
         return profiles[name]
 
     return {}
+
+def format_row(data: dict, name: str, is_default: bool):
+    """Parse status and dates from a cluster of project object and returns elements"""
+
+    if not data.get('status'):
+        raise click.ClickException(f"Can't find 'status' in project/cluster data")
+
+    status = data.get('status')
+    if status == 'ready':
+        msg = click.style(status, fg='green')
+    elif status in ['failed', 'deleted']:
+        msg = click.style(status, fg='red')
+    elif status in ['deploying', 'deleting', 'pending']:
+        msg = click.style(status, fg='yellow')
+    else:
+        msg = status
+
+    if is_default:
+        default = "*"
+    else:
+        default = ""
+
+    created_at = dateutil.parser.parse(data['created_at'])
+    updated_at = dateutil.parser.parse(data['updated_at'])
+    now = datetime.now(tz=created_at.tzinfo)
+
+    row = [click.style(name, bold=True), human_readable.date_time(now - created_at), human_readable.date_time(now - updated_at), msg, default]
+    return row, status, name
 
 def profile_list():
     """Return all profiles as a dict, or empty if none."""
