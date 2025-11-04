@@ -180,8 +180,16 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
     source_nodepool = json.loads(_run_kubectl(source.get('project_id'), source.get('cluster_id'), user, group,
                                  ['get', 'nodepool', '-o', 'json'], capture=True).stdout.decode('utf-8'))
 
+    # Ensure at least a nodepool is attached to the cluster
+    if len(source_nodepool.get('items')) == 0:
+        raise click.ClickException(f"Can't find nodepool in cluster {from_cluster}")
+
     target_nodepool = json.loads(_run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
                                  ['get', 'nodepool', '-o', 'json'], capture=True).stdout.decode('utf-8'))
+
+    # Ensure at least a nodepool is attached to the cluster
+    if len(target_nodepool.get('items')) == 0:
+        raise click.ClickException(f"Can't find nodepool in cluster {to_cluster}")
 
     source.update({'network_id': source_nodepool['items'][0]['metadata']['labels']['oks.network_id'],
                    'account_id': source_nodepool['items'][0]['metadata']['labels']['oks.account-id']})
