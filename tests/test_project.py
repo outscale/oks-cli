@@ -476,6 +476,80 @@ def test_project_publicips_yaml(mock_request, add_default_profile):
 # END PROJECT PUBLICIPS COMMAND
 
 
+# START PROJECT NETS COMMAND
+# Test the "project nets" command: verifies fetching project nets
+nets = [{
+    "DhcpOptionsSetId": "dopt-12345678",
+    "IpRange": "10.50.0.0/16",
+    "NetId": "vpc-12345678",
+    "State": "available",
+    "Tags": [
+        {
+            "Key": "Name",
+            "Value": "default"
+        }
+    ]
+}]
+
+@patch("oks_cli.utils.requests.request")
+def test_project_nets_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Nets": nets })
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "nets", "-p", "test"])
+    assert result.exit_code == 0
+
+    data = json.loads(result.output)
+    assert isinstance(data, list)
+    assert data == nets
+
+@patch("oks_cli.utils.requests.request")
+def test_project_nets_json(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Nets": nets })
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "project", "nets",
+        "-p", "test-project",
+        "-o", "json",
+        "--profile", "default"
+    ])
+
+    assert result.exit_code == 0
+
+    data = json.loads(result.output)
+    assert isinstance(data, list)
+    assert data == nets
+
+@patch("oks_cli.utils.requests.request")
+def test_project_nets_yaml(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Nets": nets })
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "project", "nets",
+        "-p", "test-project",
+        "-o", "yaml",
+        "--profile", "default"
+    ])
+
+    assert result.exit_code == 0
+
+    data = yaml.safe_load(result.output)
+    assert isinstance(data, list)
+    assert data == nets
+# END PROJECT NETS COMMAND
+
+
 # Test the "project list" command with --watch option
 @patch("oks_cli.utils.requests.request")
 @patch("time.sleep")

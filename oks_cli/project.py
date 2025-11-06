@@ -392,3 +392,21 @@ def project_get_public_ips(ctx, project_name, output, profile):
 
     data = do_request("GET", f'projects/{project_id}/public_ips')
     print_output(data, output)
+
+
+
+# GET NETS BY PROJECT NAME
+@project.command('nets', help="Get project nets")
+@click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--profile',help="Configuration profile to use")
+@click.pass_context
+def project_get_public_ips(ctx, project_name, output, profile):
+    """Retrieve the list of Nets associated with the specified project."""
+    project_name, _, profile = ctx_update(ctx, project_name, None, profile)
+    login_profile(profile)
+
+    project_id = find_project_id_by_name(project_name)
+
+    data = do_request("GET", f'projects/{project_id}/nets')
+    print_output(data, output)
