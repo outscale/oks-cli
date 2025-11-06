@@ -384,6 +384,21 @@ def login_profile(name):
 
     return {}
 
+def format_status(status: str) -> str:
+    """Colorize status using click"""
+    if not status:
+        return ""
+    msg = ""
+    if status == 'ready':
+        msg = click.style(status, fg='green')
+    elif status in ['failed', 'deleted']:
+        msg = click.style(status, fg='red')
+    elif status in ['deploying', 'deleting', 'pending', 'updating']:
+        msg = click.style(status, fg='yellow')
+    else:
+        msg = status
+    return msg
+
 def format_row(data: dict, name: str, is_default: bool):
     """Parse status and dates from a cluster of project object and returns elements"""
 
@@ -391,14 +406,7 @@ def format_row(data: dict, name: str, is_default: bool):
         raise click.ClickException(f"Can't find 'status' in project/cluster data")
 
     status = data.get('status')
-    if status == 'ready':
-        msg = click.style(status, fg='green')
-    elif status in ['failed', 'deleted']:
-        msg = click.style(status, fg='red')
-    elif status in ['deploying', 'deleting', 'pending']:
-        msg = click.style(status, fg='yellow')
-    else:
-        msg = status
+    msg = format_status(status=status)
 
     if is_default:
         default = "*"
