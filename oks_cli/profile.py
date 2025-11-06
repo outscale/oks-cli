@@ -20,7 +20,8 @@ def profile():
 @click.option('--region', required=True, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', help="Enable JWT, by default is false")
-@click.option('--output', required=False, type=click.Choice(['json', 'yaml']), default='json', help="Default commands output format. Supported 'json,yaml', default 'json'")
+@click.option('--output', required=False, type=click.Choice(['json', 'yaml', 'table']), default='json',
+              help="Default commands output format. Supported 'json,yaml,table', default 'json'")
 def add_profile(profile_name, description, access_key, secret_key, username, password, region, endpoint, jwt, output):
     """Add a new profile with AK/SK or username/password authentication."""
     if not profile_name:
@@ -74,7 +75,7 @@ def add_profile(profile_name, description, access_key, secret_key, username, pas
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', required=False, help="Enable jwt, by default is false", type=click.BOOL)
 @click.option('--force', is_flag=True, help="Force update profile name without confirmation")
-@click.option('--output', required=False, type=click.Choice(['json', 'yaml']), help="Default commands output format. Supported 'json,yaml'")
+@click.option('--output', required=False, type=click.Choice(['json', 'yaml', 'table']), help="Default commands output format. Supported 'json,yaml,table'")
 def update_profile(profile_name, region, endpoint, jwt, new_name, force, output, description):
     """Update configuration settings for an existing profile."""
     profiles = profile_list()
