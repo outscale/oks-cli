@@ -1,6 +1,6 @@
 import click
 import time
-import datetime
+from datetime import datetime
 import dateutil.parser
 import human_readable
 import prettytable
@@ -10,7 +10,7 @@ from prettytable import TableStyle
 from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, \
                    detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, \
                    format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer, \
-                   format_row
+                   format_row, format_status
 
 # DEIFNE THE PROJECT COMMAND GROUP
 @click.group(help="Project related commands.")
@@ -68,7 +68,7 @@ def project_logout(ctx, profile):
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--uuid', is_flag=True, help="Show UUID")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
-@click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o',  type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is table")
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
 def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output, profile):
@@ -89,7 +89,7 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 
     data = do_request("GET", 'projects', params=params)
 
-    if output:
+    if output in ["json", "yaml"]:
         print_output(data, output)
         return
 
@@ -240,10 +240,11 @@ def project_create(ctx, project_name, description, cidr, quirk, tags, disable_ap
 # GET PROJECT BY NAME
 @project.command('get', help="Get default project or the project by name")
 @click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
+@click.option('--tags', is_flag=True, help="Show tags in table format output")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def project_get(ctx, project_name, output, profile):
+def project_get(ctx, project_name, output, profile, tags):
     """Retrieve and display project details by name or default project."""
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
@@ -251,12 +252,34 @@ def project_get(ctx, project_name, output, profile):
     project_id = find_project_id_by_name(project_name)
 
     data = do_request("GET", f'projects/{project_id}')
-    print_output(data, output)
+
+    if output in ["json", "yaml"]:
+        print_output(data, output)
+    else:
+        fields = [["PROJECT", "name"], ["PROFILE", "profile"], ["CIDR", "cidr"], ["REGION", "region"], ["CREATED", "created_at"],
+                  ["UPDATED", "updated_at"], ["STATUS", "status"]]
+        created_at = dateutil.parser.parse(data.get('created_at'))
+        updated_at = dateutil.parser.parse(data.get('updated_at'))
+        now = datetime.now(tz=created_at.tzinfo)
+
+        data.update({"created_at": human_readable.date_time(now - created_at)})
+        data.update({"updated_at": human_readable.date_time(now - updated_at)})
+        data.update({"status": format_status(status=data.get('status'))})
+        data.update({"profile": profile or os.getenv('OKS_PROFILE')})
+        print_table([data], table_fields=fields)
+        if tags:
+            fields = [["TAG KEY", "tag_key"], ["TAG VALUE", "tag_value"]]
+            tag_dict = data.get('tags')
+            tags = list()
+            for k in tag_dict.keys():
+                tags.append({"tag_key": k, "tag_value": tag_dict.get(k)})
+            print_table(tags, table_fields=fields)
+
 
 # DELETE PROJECT BY NAME
 @project.command('delete', help="Delete a project by name")
 @click.option('--project-name', '-p', required=False, help="Project Name", type=click.STRING, shell_complete=project_completer)
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is table")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
@@ -273,16 +296,23 @@ def project_delete_command(ctx, project_name, output, dry_run, force, profile):
 
     if dry_run:
         message = {"message": "Dry run: The project would be deleted."}
-        print_output(message, output)
+        if output in ["json", "yaml"]:
+            print_output(message, output)
+        else:
+            print_table([{"name": project_name, "message": message.get('message')}],
+                        [["PROJECT", "name"], ["MESSAGE", "message"]], align="c")
         return
 
     if force or click.confirm(f"Are you sure you want to delete the project with name {project_name}?", abort=True):
         data = do_request("DELETE", f'projects/{project_id}')
-
         if current_project_id == project_id:
             set_project_id("")
             set_cluster_id("")
-        print_output(data, output)
+        if output in ["json", "yaml"]:
+            print_output(data, output)
+        else:
+            data.update({"name": project_name})
+            print_table([data], [["PROJECT", "name"], ["MESSAGE", "Details"]], align="c")
 
 
 # UPDATE PROJECT BY NAME
@@ -328,10 +358,36 @@ def project_update_command(ctx, project_name, description, quirk, tags, disable_
         project_config['tags'] = parsed_tags
 
     if dry_run:
-        print_output(project_config, output)
+        if output in ["json", "yaml"]:
+            print_output(project_config, output)
+        else:
+            print_table([{"name": project_name, "updated": project_config}],
+                        table_fields=[["PROJECT", "name"], ["FIELD TO UPDATE (dry run)", "updated"]])
     else:
         data = do_request("PATCH", f'projects/{project_id}', json = project_config)
-        print_output(data, output)
+        if output in ["json", "yaml"]:
+            print_output(data, output)
+        else:
+            fields = [["PROJECT", "name"], ["PROFILE", "profile"], ["CIDR", "cidr"], ["REGION", "region"], ["CREATED", "created_at"],
+                      ["UPDATED", "updated_at"], ["STATUS", "status"]]
+            created_at = dateutil.parser.parse(data.get('created_at'))
+            updated_at = dateutil.parser.parse(data.get('updated_at'))
+            now = datetime.now(tz=created_at.tzinfo)
+
+            data.update({"created_at": human_readable.date_time(now - created_at)})
+            data.update({"updated_at": human_readable.date_time(now - updated_at)})
+            data.update({"status": format_status(status=data.get('status'))})
+            data.update({"profile": profile or os.getenv('OKS_PROFILE')})
+            print_table([data], table_fields=fields)
+
+            # Print table for tags
+            fields = [["TAG KEY", "tag_key"], ["TAG VALUE", "tag_value"]]
+            tag_dict = data.get('tags')
+            tags = list()
+            for k in tag_dict.keys():
+                tags.append({"tag_key": k, "tag_value": tag_dict.get(k)})
+            print_table(tags, table_fields=fields)
+
 
 # GET PROJECT QUOTAS BY PROJECT NAME
 @project.command('quotas', help="Get project quotas")
