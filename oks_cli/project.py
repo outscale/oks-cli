@@ -411,8 +411,10 @@ def project_update_command(ctx, project_name, description, quirk, tags, disable_
         if output in ["json", "yaml"]:
             print_output(project_config, output)
         else:
-            print_table([{"name": project_name, "updated": project_config}],
-                        table_fields=[["PROJECT", "name"], ["FIELD TO UPDATE (dry run)", "updated"]])
+            fields = [["PROJECT", "name"]]
+            fields.extend([k.upper(), k] for k in project_config.keys())
+            project_config.update({"name": project_name or project_id})
+            print_table([project_config], table_fields=fields)
     else:
         data = do_request("PATCH", f'projects/{project_id}', json = project_config)
         if output in ["json", "yaml"]:
