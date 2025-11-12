@@ -85,11 +85,12 @@ def cluster_logout(ctx, profile):
 @click.option('--plain', is_flag=True, help="Plain table format")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, default table")
+@click.option('--wide', is_flag=True, help="Prints additional info, only supported for table output")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, default table")
 @click.option('--profile', help="Configuration profile to use")
 @click.option('--all', '-A', is_flag=True, help="List clusters from all projects")
 @click.pass_context
-def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, output, profile, all):
+def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch, wide, output, profile, all):
     """Display clusters with optional filtering and real-time monitoring."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -123,13 +124,14 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     else:
         data = do_request("GET", "clusters", params=params)
 
-    if output == "wide":
+    if output in ["json", "yaml"]:
+        print_output(data, output)
+        return
+
+    if wide:
         field_names.insert(0, "ID")
         field_names.append("VERSION")
         field_names.append("CONTROL PLANE")
-    elif output in ["json", "yaml"]:
-        print_output(data, output)
-        return
 
     table = prettytable.PrettyTable()
     table.field_names = field_names
@@ -151,7 +153,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
         if all:
             project_name = click.style(cluster.get("project_name"), bold=True)
             row.insert(0, project_name)
-        if output == "wide":
+        if wide:
             row.insert(0, cluster.get('id'))
             row.append(cluster.get('version'))
             row.append(cluster.get('control_planes'))
@@ -195,6 +197,10 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         if all:
                             project_name = click.style(cluster.get("project_name"), bold=True)
                             row.insert(0, project_name)
+                        if wide:
+                            row.insert(0, cluster.get('id'))
+                            row.append(cluster.get('version'))
+                            row.append(cluster.get('control_planes'))
 
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
@@ -208,6 +214,10 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                     if all:
                         project_name = click.style(cluster.get("project_name"), bold=True)
                         row.insert(0, project_name)
+                    if wide:
+                        row.insert(0, cluster.get('id'))
+                        row.append(cluster.get('version'))
+                        row.append(cluster.get('control_planes'))
 
                     cl_id = cluster.get('id')
 
