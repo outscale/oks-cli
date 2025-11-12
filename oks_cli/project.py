@@ -362,7 +362,7 @@ def project_delete_command(ctx, project_name, output, dry_run, force, profile):
             print_output(data, output)
         else:
             data.update({"name": project_name})
-            print_table([data], [["PROJECT", "name"], ["MESSAGE", "Details"]], align="c")
+            print_table([data], table_fields=[["PROJECT", "name"], ["MESSAGE", "Details"]], align="c")
 
 
 # UPDATE PROJECT BY NAME
