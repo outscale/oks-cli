@@ -23,7 +23,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, format_row
+                   kubeconfig_parse_fields, print_table, format_row, format_status
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -85,7 +85,7 @@ def cluster_logout(ctx, profile):
 @click.option('--plain', is_flag=True, help="Plain table format")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table", "wide"]), help="Specify output format, default table")
 @click.option('--profile', help="Configuration profile to use")
 @click.option('--all', '-A', is_flag=True, help="List clusters from all projects")
 @click.pass_context
@@ -127,7 +127,7 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
         field_names.insert(0, "ID")
         field_names.append("VERSION")
         field_names.append("CONTROL PLANE")
-    elif output:
+    elif output in ["json", "yaml"]:
         print_output(data, output)
         return
 
@@ -233,15 +233,102 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
         except KeyboardInterrupt:
             click.echo("\nWatch stopped.")
 
+def _update_cluster_data(data: dict) -> dict:
+    """ Update cluster data dict returned by API to be human readable"""
+    if data.get('statuses'):
+        if data.get('statuses').get('created_at'):
+            created_at = dateutil.parser.parse(data.get('statuses').get('created_at'))
+            now = datetime.now(tz=created_at.tzinfo)
+            data.update({"created_at": human_readable.date_time(now - created_at)})
+
+        if data.get('statuses').get('updated_at') and data.get('statuses').get('created_at'):
+            updated_at = dateutil.parser.parse(data.get('statuses').get('updated_at'))
+            data.update({"updated_at": human_readable.date_time(now - updated_at)})
+
+        if data.get('statuses').get('status'):
+            data.update({"status": format_status(status=data.get('statuses').get('status'))})
+
+    if data.get('disable_api_termination'):
+        data.update({"disable_api_termination": "disabled"})
+    else:
+        data.update({"disable_api_termination": "enabled"})
+
+    if os.getenv('OKS_PROFILE'):
+        data.update({"profile": os.getenv('OKS_PROFILE')})
+
+    if data.get('cp_subregions'):
+        data.update({"cp_subregions": ",".join(data.get('cp_subregions'))})
+
+    if data.get('description') and len(data.get('description')) > 20:
+        data.update({'description': data.get('description')[0:20] + "..."})
+
+    if data.get('admin_whitelist') and len(data.get('admin_whitelist')):
+        data.update({"admin_whitelist": "\n".join(data.get('admin_whitelist'))})
+
+    if data.get('tags'):
+        tags = list()
+        for key, value in data.get('tags').items():
+            tags.append(f"{key}: {value}")
+        data.update({"tags": "\n".join(sorted(tags))})
+
+    if data.get('admission_flags'):
+        data.update({"disable_admission_plugins": "\n".join(data.get('admission_flags').get('disable_admission_plugins'))})
+        data.update({"enable_admission_plugins": "\n".join(data.get('admission_flags').get('enable_admission_plugins'))})
+        data.update({"applied_admission_plugins": "\n".join(data.get('admission_flags').get('applied_admission_plugins'))})
+
+    return data
+
+def _print_cluster_info_table(data: dict, network: bool=False, maintenance: bool=False, plugins: bool=False, full: bool=False) -> None:
+    """ Print cluster information as table output"""
+    # First, basic information
+    fields = [["CLUSTER", "name"], ["PROFILE", "profile"], ["DESCRIPTION", "description"], ["REGIONS", "cp_subregions"],
+              ["MULTI AZ", "cp_multi_az"], ["CREATED", "created_at"], ["UPDATED", "updated_at"], ["STATUS", "status"],
+              ["VERSION", "version"], ["UPGRADABLE", "available_upgrade"], ["API TERMINATION", "disable_api_termination"]]
+    data = _update_cluster_data(data=data)
+    print_table([data], table_fields=fields)
+
+    if network or full:
+        fields = [["CONTROLE PLANES", "control_planes"], ["CNI", "cni"], ["CIDR PODS", "cidr_pods"], ["CIDR SERVICE", "cidr_service"], ["CLUSTER DNS", "cluster_dns"],
+                  ["ADMIN WHITELIST", "admin_whitelist"], ["ADMIN LBU", "admin_lbu"], ["TAGS", "tags"]]
+        click.echo()
+        print_table([data], table_fields=fields)
+
+    if plugins or full:
+        fields = [["ADMISSION PLUGINS APPLIED", "applied_admission_plugins"],
+                  ["ADMISSION PLUGINS ENABLED", "enable_admission_plugins"],
+                  ["ADMISSION PLUGINS DISABLED", "disable_admission_plugins"]]
+        click.echo()
+        print_table([data], table_fields=fields)
+
+    if maintenance or full:
+        upgrade = data.get('auto_maintenances')
+        for name in ["minor", "patch"]:
+            fields = [[f"{name.upper()} UPGRADE ENABLED", "enabled"],
+                      [f"{name.upper()} UPGRADE DURATION (hrs)", "duration"],
+                      [f"{name.upper()} UPGRADE START", "start"],
+                      [f"{name.upper()} UPGRADE WEEK DAY", "day"],
+                      [f"{name.upper()} UPGRADE TZ", "tz"]]
+            maint = upgrade.get(f"{name}_upgrade_maintenance")
+            click.echo()
+            print_table([{"enabled": maint.get('enabled'),
+                          "duration": maint.get('duration_hours'),
+                          "start": maint.get('start_hour'),
+                          "day": maint.get('week_day'),
+                          "tz": maint.get('tz')}],
+                          table_fields=fields)
 
 # GET CLUSTER BY NAME
 @cluster.command('get', help="Get a cluster by name")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--network', is_flag=True, help="Show cluster network info, table output only")
+@click.option('--plugins', is_flag=True, help="Show adminssion plugins status, table output only")
+@click.option('--maintenance', is_flag=True, help="Show auto maintenance upgrade schedules, table output only")
+@click.option('--full', is_flag=True, help="Show full cluster information, table output only")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_get_command(ctx, project_name, cluster_name, output, profile):
+def cluster_get_command(ctx, project_name, cluster_name, output, profile, network, maintenance, plugins, full):
     """Retrieve and display detailed information about a specific cluster."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -251,7 +338,10 @@ def cluster_get_command(ctx, project_name, cluster_name, output, profile):
 
     data = do_request("GET", f'clusters/{cluster_id}')
 
-    print_output(data, output)
+    if output in ["json", "yaml"]:
+        print_output(data, output)
+    else:
+        _print_cluster_info_table(data=data, network=network, plugins=plugins, maintenance=maintenance, full=full)
 
 
 def prepare_cluster_template(cluster_config):
@@ -344,7 +434,10 @@ def _create_cluster(project_name, cluster_config, output):
         cluster_template['project_id'] = project_id
 
         data = do_request("POST", 'clusters', json=cluster_template)
-        print_output(data, output)
+        if output in ["json", "yaml"]:
+            print_output(data, output)
+        else:
+            _print_cluster_info_table(data=data, full=True)
 
 
 # CLUSTER CREATE BY NAME
@@ -365,7 +458,7 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
 @click.option('--cp-multi-az', '-m', is_flag=True, help="Enable control plane multi AZ")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
@@ -444,7 +537,10 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
         _create_cluster(project_name, cluster_config, output)
     else:
         cluster_template = prepare_cluster_template(cluster_config)
-        print_output(cluster_template, output)
+        if output in ["json", "yaml"]:
+            print_output(cluster_template, output)
+        else:
+            _print_cluster_info_table(data=cluster_template, full=True)
 
 # UPDATE CLUSTER
 @cluster.command('update', help="Update a cluster by name")
@@ -460,7 +556,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
 @click.option('--control-plane', shell_complete=shell_completions, help="Controlplane plan")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
-@click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o',  default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to update the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
@@ -544,20 +640,30 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
         cluster_config['control_planes'] = control_plane
 
     if dry_run:
-        print_output(cluster_config, output)
+        if output in ["json", "yaml"]:
+            print_output(cluster_config, output)
+        else:
+            fields = [["PROFILE", "profile"], ["CLUSTER NAME", "cluster_name"]]
+            fields.extend([k.upper(), k] for k in cluster_config.keys())
+            cluster_config.update({"cluster_name": cluster_name})
+            cluster_config = _update_cluster_data(data=cluster_config)
+            print_table([cluster_config], table_fields=fields)
     else:
         data = do_request("PATCH", f'clusters/{cluster_id}', json=cluster_config)
-        print_output(data, output)
+        if output in ["json", "yaml"]:
+            print_output(data, output)
+        else:
+            _print_cluster_info_table(data=data, full=True)
 
 # UPGRADE CLUSTER
 @cluster.command('upgrade', help="Upgrade a cluster by name")
 @click.option('--project-name', '-p', required=False, help="Project name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name", shell_complete=cluster_completer)
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--force', is_flag=True, help="Force upgrade")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_update_command(ctx, project_name, cluster_name, output, force, profile):
+def cluster_upgrade_command(ctx, project_name, cluster_name, output, force, profile):
     """CLI command to upgrade an existing Kubernetes cluster to the latest supported version."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -568,13 +674,17 @@ def cluster_update_command(ctx, project_name, cluster_name, output, force, profi
 
     if force or click.confirm(f"Are you sure you want to upgrade the cluster with name {cluster_name}?", abort=True):
         data = do_request("PATCH", f'clusters/{cluster_id}/upgrade')
-        print_output(data, output)
+        if output in ["json", "yaml"]:
+            print_output(data, output)
+        else:
+            _print_cluster_info_table(data=data, full=True)
 
 # DELETE CLUSTER BY NAME
+# "Details": "Cluster 377a1d1b-7f2f-4bde-931b-d2abf85abaf7 successfully deleted"
 @cluster.command('delete', help="Delete a cluster by name")
 @click.option('--project-name', '-p', required=False, help="Project name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster name", shell_complete=cluster_completer)
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
@@ -599,14 +709,18 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
         data = do_request("DELETE", f'clusters/{cluster_id}')
         if cluster_id == cluster_login:
             set_cluster_id("")
-        print_output(data, output)
+        if output in ["json", "yaml"]:
+            print_output(data, output)
+        else:
+            data.update({"cluster_name": cluster_name})
+            print_table([data], table_fields=[["CLUSTER", "cluster_name"], ["MESSAGE", "Details"]], align="c")
 
 # GET KUBECONFIG
 @cluster.command('kubeconfig', help="Fetch the kubeconfig for a cluster")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--print-path', is_flag=True, help="Print path to saved kubeconfig")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table"]), default="yaml", help="Specify output format, default is yaml")
+@click.option('--output', '-o', default="yaml", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, default is yaml")
 @click.option('--wide', is_flag=True, help="Prints additional info, only supported for table output")
 @click.option('--refresh', '--force', is_flag=True, help="Force refresh saved kubeconfig")
 @click.option('--nacl', is_flag=True, help="Use public key encryption on wire (require api support)")
@@ -684,10 +798,10 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
                 kubedata = kubeconfig_parse_fields(kubeconfig_str, cluster_name, user, group)
                 if not len(kubedata):
                     raise SystemExit("Something went wrong, could not parse kubeconfig")
-                fields = [["user", "user"], ["group", "group"], ["expiration date", "expires_at"]]
+                fields = [["USER", "user"], ["GROUP", "group"], ["EXPIRATION DATE", "expires_at"]]
                 if wide:
-                    fields.extend([["Cert subject", "cn"], ["context:name", "context_name"], ["context:user", "ctx_user"],
-                                   ["context:cluster", "cluster_name"], ["cluster endpoint", "server_name"]])
+                    fields.extend([["CCERT SUBJECT", "cn"], ["CONTEXT:NAME", "context_name"], ["CONTEXT:USER", "ctx_user"],
+                                   ["CONTEXT:CLUSTER", "cluster_name"], ["CLUSTER ENDPOINT", "server_name"]])
                 print_table(kubedata, fields)
             else:
                 raise SystemExit(f"Could not find {kubeconfig_path}")
@@ -784,12 +898,37 @@ def nodepool_list(ctx):
                  'get', 'nodepool', '-o', 'wide'])
 
 
+def _print_nodepool_info_table(data: dict) -> None:
+    """ Parses NodePool manifest and renders it as table output"""
+
+    fields = [["NODEPOOL", "name"], ["NODE TYPE", "nodeType"], ["DESIRED NODES", "desiredNodes"], ["ZONES", "zones"],
+              ["AUTOHEALING", "autoHealing"], ["VOLUMES", "volumes"]]
+
+    volumes = list()
+    spec = data.get('spec')
+    
+    for vol in spec.get('volumes'):
+        volumes.append(",".join(sorted([f"{k}={v}" for k,v in vol.items()])))
+    
+    print_table([{"name": data.get('metadata').get('name'), "nodeType": spec.get('nodeType'), "desiredNodes": spec.get('desiredNodes'),
+                  "zones": ",".join(spec.get('zones')), "autoHealing": spec.get('autoHealing', True),
+                  "volumes": "\n".join(volumes)}], table_fields=fields)
+
+    if spec.get('upgradeStrategy') and spec.get('upgradeStrategy').get('autoUpgradeMaintenance'):
+        fields = [["AUTOUPGRADE MAINENANCE", "autoUpgradeEnabled"], ["DURATION (hrs)", "durationHours"], ["START HOUR", "startHour"],
+                ["WEEK DAY", "weekDay"]]
+        maint = spec.get('upgradeStrategy').get('autoUpgradeMaintenance')
+        print_table([{"autoUpgradeEnabled": spec.get('upgradeStrategy').get('autoUpgradeEnabled'),
+                      "durationHours": maint.get('durationHours'), "startHour": maint.get('startHours'),
+                      "weekDay": maint.get('weekDay')  }], table_fields=fields)
+
+
 @nodepool.command('create', help="Create a new nodepool")
 @click.option('--nodepool-name', '-n', default="nodepool01", help="Nodepool Name")
 @click.option('--count', '-c', default=2, help="Count of nodes")
 @click.option('--type', 'vmtype', '-t', default="tinav6.c2r4p3", help="Type of VMs")
 @click.option('--zone', '-z', multiple=True, help="Provide zone(s)")
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', default="json", type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json (dry-run only)")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the Nodepool")
 @click.pass_context
@@ -811,10 +950,14 @@ def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, 
         raise click.BadArgumentUsage("Missing option '--zone' / '-z'.")
 
     if dry_run:
-        print_output(nodepool, output)
+        if output in ["json", "yaml"]:
+            print_output(nodepool, output)
+        else:
+            _print_nodepool_info_table(data=nodepool)
+            pass
     else:
         _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'], [
-                 'create', '-f', '-'], input=json.dumps(nodepool))
+                    'create', '-f', '-'], input=json.dumps(nodepool))
 
 
 @nodepool.command('delete')
