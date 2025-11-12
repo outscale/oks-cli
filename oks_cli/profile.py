@@ -75,7 +75,7 @@ def add_profile(profile_name, description, access_key, secret_key, username, pas
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
 @click.option('--jwt', required=False, help="Enable jwt, by default is false", type=click.BOOL)
 @click.option('--force', is_flag=True, help="Force update profile name without confirmation")
-@click.option('--output', required=False, type=click.Choice(['json', 'yaml', 'table']), help="Default commands output format. Supported 'json,yaml,table'")
+@click.option('--output', required=False, type=click.Choice(['json', 'yaml', 'table']), help="Default commands output format")
 def update_profile(profile_name, region, endpoint, jwt, new_name, force, output, description):
     """Update configuration settings for an existing profile."""
     profiles = profile_list()
