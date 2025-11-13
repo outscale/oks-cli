@@ -669,7 +669,7 @@ NetPeering pcx-33e30194 successfully created and active between projects 'cluste
 """
 
 # Test the "netpeering create" command: verifies an error is thrown about overlaping networks
-# netpeering create --from-project projectA --from-cluster clusterA \
+# netpeering create --source "default:projectA:clusterA" \
 #                   --to-project projectB --to-cluster clusterB     \
 #                   --netpeering-name testC --auto-approve
 
@@ -691,14 +691,14 @@ def test_netpeering_create_netoverlap_command(mock_request, add_default_profile)
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "test", "--auto-approve",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     assert result.exit_code == 1
     assert "Error: Source network 10.50.0.0/16 and target network 10.50.0.0/16 overlap, you can't create netpeering. Aborted!\n" in result.stderr
 
 # Test the "netpeering create" command: verifies that source cluster without nodepool throws error
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC
 
 @patch("oks_cli.utils.subprocess.run")
@@ -740,18 +740,19 @@ def test_netpeering_create_source_cluster_without_nodepool_fails_command(mock_re
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "test",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
+
     assert result.exit_code == 1
     assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
     assert args[0] == ['kubectl', 'get', 'nodepool', '-o', 'json']
     assert "Can't find nodepool in cluster clusterA" in result.stderr
 
 # Test the "netpeering create" command: verifies that target cluster without nodepool throws error
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC
 
 @patch("oks_cli.utils.subprocess.run")
@@ -828,8 +829,8 @@ def test_netpeering_create_target_cluster_without_nodepool_fails_command(mock_re
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "test",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 1
@@ -839,8 +840,8 @@ def test_netpeering_create_target_cluster_without_nodepool_fails_command(mock_re
 
 
 # Test the "netpeering create" command: verifies that a NetPeering already exists
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC
 
 @patch("oks_cli.utils.subprocess.run")
@@ -974,8 +975,8 @@ def test_netpeering_create_peering_exists_command(mock_request, mock_run, add_de
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "test",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 1
@@ -984,8 +985,8 @@ def test_netpeering_create_peering_exists_command(mock_request, mock_run, add_de
     assert fake_response in result.output
 
 # Test the "netpeering create" command: verifies that a NetPeering already exists
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC --dry-run
 
 @patch("oks_cli.utils.subprocess.run")
@@ -1097,8 +1098,8 @@ def test_netpeering_create_dryrun_command(mock_request, mock_run, add_default_pr
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "mynetpeering-name",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB", "--dry-run"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB", "--dry-run"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 0
@@ -1111,8 +1112,8 @@ def test_netpeering_create_dryrun_command(mock_request, mock_run, add_default_pr
     assert data.get("spec").get('accepterOwnerId') == "363338042637"
 
 # Test the "netpeering create" command: verifies that a NetPeering fails because of an error during apply
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC
 
 @patch("time.sleep")
@@ -1244,8 +1245,8 @@ def test_netpeering_create_requestexception_command(mock_request, mock_run, mock
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "mynetpeering-name",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 1
@@ -1254,8 +1255,8 @@ def test_netpeering_create_requestexception_command(mock_request, mock_run, mock
     assert "Cannot create NetPeeringRequest:" in result.stderr
 
 # Test the "netpeering create" command: verifies that a NetPeering state is in wrong state
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA \
+#                   --target "default:projectB:clusterB \
 #                   --netpeering-name testC
 
 @patch("time.sleep")
@@ -1397,8 +1398,8 @@ def test_netpeering_create_netpeering_wrongstate_command(mock_request, mock_run,
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "mynetpeering-name",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 1
@@ -1407,8 +1408,8 @@ def test_netpeering_create_netpeering_wrongstate_command(mock_request, mock_run,
     assert "NetPeeringAcceptance is in wrong state: wrong-state" in result.stderr
 
 # Test the "netpeering create" command: verifies that a NetPeeringAcceptance fails
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA \
+#                   --target "default:projectB:clusterB \
 #                   --netpeering-name testC
 
 @patch("time.sleep")
@@ -1558,8 +1559,8 @@ def test_netpeering_create_netpeeringacceptance_fails_command(mock_request, mock
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "mynetpeering-name", "--auto-approve",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 1
@@ -1568,8 +1569,8 @@ def test_netpeering_create_netpeeringacceptance_fails_command(mock_request, mock
     assert "Error: Could not create NetPeeringAcceptance object" in result.stderr
 
 # Test the "netpeering create" command: verifies that a NetPeering just created has a wrong-state
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC
 
 @patch("time.sleep")
@@ -1779,8 +1780,8 @@ def test_netpeering_create_netpeering_checkstate_ok_command(mock_request, mock_r
     runner = CliRunner()
     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
                                  "create", "--netpeering-name", "mynetpeering-name", "--auto-approve",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+                                 "--source", "default:projectA:clusterA",
+                                 "--target", "default:projectB:clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 0
@@ -1790,8 +1791,8 @@ def test_netpeering_create_netpeering_checkstate_ok_command(mock_request, mock_r
 
 
 # Test the "netpeering create" command: verifies that a when --auto-approve is not set, the netpeering request is deleted
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
+# netpeering create --source "default:projectA:clusterA" \
+#                   --target "default:projectB:clusterB"     \
 #                   --netpeering-name testC
 
 # @patch("time.sleep")
@@ -1943,8 +1944,8 @@ def test_netpeering_create_netpeering_checkstate_ok_command(mock_request, mock_r
 #     runner = CliRunner()
 #     result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
 #                                  "create", "--netpeering-name", "mynetpeering-name",
-#                                  "--from-project", "projectA", "--from-cluster", "clusterA",
-#                                  "--to-project", "projectB", "--to-cluster", "clusterB"])
+#                                  "--source", "default:projectA:clusterA",
+#                                  "--target", "default:projectB:clusterB"])
 #     mock_run.assert_called()
 #     args, kwargs = mock_run.call_args
 #     assert result.exit_code == 0
