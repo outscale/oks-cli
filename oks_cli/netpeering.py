@@ -4,7 +4,7 @@ import time
 import ipaddress
 import uuid
 from subprocess import CalledProcessError
-
+import os, sys
 from .utils import cluster_completer, print_output, find_project_id_by_name,   \
                    find_cluster_id_by_name, login_profile, ctx_update,         \
                    profile_completer, project_completer, find_project_by_name, \
@@ -96,7 +96,7 @@ def netpeering_delete(ctx, netpeering_id, dry_run, force):
             raise click.ClickException(f"Could not delete NetPeering {netpeering_id}: {e}")
 
 
-def _gather_info(project: str=None, cluster: str=None) -> dict:
+def load_environment(profile: str=None, project: str=None, cluster: str=None) -> dict:
     """
         Gather information about project and cluster required to create a NetPeering
         Set:
@@ -106,7 +106,9 @@ def _gather_info(project: str=None, cluster: str=None) -> dict:
         - cluster_id
         - project_cidr
     """
+
     info = dict()
+    login_profile(profile)
 
     if not project or not cluster:
         raise click.ClickException("Project and cluster name are required")
@@ -115,6 +117,7 @@ def _gather_info(project: str=None, cluster: str=None) -> dict:
     info.update({'cluster_name': cluster, 'project_name': project})
     info.update({'project_id': project_data.get('id'), 'project_cidr': project_data.get('cidr')})
     info.update({'cluster_id': find_cluster_id_by_name(info.get('project_id'), info.get('cluster_name'))})
+
     return info
 
 
@@ -147,12 +150,10 @@ def _netpeering_exists(source: dict=None, target: dict=None, user: str=None, gro
     return False
 
 
-@netpeering.command('create', help="Create a NetPeering between 2 projects")
-@click.option('--from-project', required=True, type=click.STRING, help="Source project name to create netpeering from")
-@click.option('--from-cluster', required=True, type=click.STRING, help="Source cluster to create netpeering from")
-@click.option('--to-project', required=True, type=click.STRING, help="Project name to create netpeering to")
-@click.option('--to-cluster', required=True, type=click.STRING, help="Target cluster to create netpeering to")
-@click.option('--netpeering-name', required=False, type=click.STRING, help="Name of the NetPeeringRequest, default to '{from-project}-to-{to-project}",
+@netpeering.command('create')
+@click.option("--source", required=True, type=click.STRING, metavar="<profile:project:cluster>", help="Source profile,project,cluster to create netpeering from. Profile can be omitted, in such case, 'default' or OKS_PROFILE will be used")
+@click.option("--target", required=True, type=click.STRING, metavar="<profile:project:cluster>", help="Target profile,project,cluster to create netpeering to. Profile can be omitted, in such case, 'default' or OKS_PROFILE will be used")
+@click.option('--netpeering-name', required=False, type=click.STRING, help="Name of the NetPeeringRequest, default to '{source-project}-to-{target-project}",
               default=None)
 @click.option('--auto-approve', required=False, is_flag=True, help="Automatically confirm NetPeering acceptance")
 @click.option('--user', type=click.STRING, help="User")
@@ -161,14 +162,23 @@ def _netpeering_exists(source: dict=None, target: dict=None, user: str=None, gro
 @click.option('--output', '-o', type=click.Choice(['json', 'yaml']), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, netpeering_name, auto_approve,
+def netpeering_create(ctx, source, target, netpeering_name, auto_approve,
                       user, group, dry_run, output, profile):
-    """Create NetPeering between 2 projects"""
-    from_project, from_cluster, profile = ctx_update(ctx, from_project, from_cluster, profile)
-    login_profile(profile)
+    """
+        Create NetPeering between 2 OKS projects.
+        Projects can be from the same profile or
+        from different profiles.
+    """
+    if len(source.split(":")) != 3:
+        raise click.ClickException("--source must contains 3 parameters")
+    if len(target.split(":")) != 3:
+        raise click.ClickException("--target must contains 3 parameters")
 
-    source = _gather_info(project=from_project, cluster=from_cluster)
-    target = _gather_info(project=to_project, cluster=to_cluster)
+    [src_profile, src_project, src_cluster] = source.split(":")
+    [dst_profile, dst_project, dst_cluster] = target.split(":")
+
+    source = load_environment(profile=src_profile, project=src_project, cluster=src_cluster)
+    target = load_environment(profile=dst_profile, project=dst_project, cluster=dst_cluster)
 
     source_cidr = ipaddress.ip_network(source.get('project_cidr'))
     target_cidr = ipaddress.ip_network(target.get('project_cidr'))
@@ -182,14 +192,14 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
 
     # Ensure at least a nodepool is attached to the cluster
     if len(source_nodepool.get('items')) == 0:
-        raise click.ClickException(f"Can't find nodepool in cluster {from_cluster}")
+        raise click.ClickException(f"Can't find nodepool in cluster {src_cluster}")
 
     target_nodepool = json.loads(_run_kubectl(target.get('project_id'), target.get('cluster_id'), user, group,
                                  ['get', 'nodepool', '-o', 'json'], capture=True).stdout.decode('utf-8'))
 
     # Ensure at least a nodepool is attached to the cluster
     if len(target_nodepool.get('items')) == 0:
-        raise click.ClickException(f"Can't find nodepool in cluster {to_cluster}")
+        raise click.ClickException(f"Can't find nodepool in cluster {dst_cluster}")
 
     source.update({'network_id': source_nodepool['items'][0]['metadata']['labels']['oks.network_id'],
                    'account_id': source_nodepool['items'][0]['metadata']['labels']['oks.account-id']})
@@ -199,7 +209,6 @@ def netpeering_create(ctx, from_project, from_cluster, to_project, to_cluster, n
 
     if _netpeering_exists(source=source, target=target, user=user, group=group):
         raise click.ClickException(f"A NetPeering already exists between projects {source.get('project_name')} and {target.get('project_name')}. Aborting!")
-
     # Generate name
     if not netpeering_name:
         netpeering_name = f"{source.get('project_name')}-to-{target.get('project_name')}"
