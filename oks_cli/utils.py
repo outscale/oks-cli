@@ -77,6 +77,8 @@ def find_response_object(data):
             return response["PublicIps"]
         elif key == "IP":
             return response["IP"]
+        elif key == "Nets":
+            return response["Nets"]
 
     raise click.ClickException("The API response format is incorrect.")
 
@@ -108,9 +110,12 @@ def do_request(method, path, *args, **kwargs):
             obj = find_response_object(data)
             return obj
         except requests.exceptions.HTTPError as err:
-            otp_response = handle_otp_error(err, lambda: do_request(method, path, *args, **kwargs))
+            otp_response = handle_otp_error(err, method, path, args, kwargs)
             if otp_response is not None:
                 return otp_response
+
+            if os.environ.get("OKS_OTP_CODE") is not None:
+                raise JSONClickException(err.response.text)
 
             jwt_response = handle_jwt_error(err, method, path, args, kwargs)
             if jwt_response is not None:
@@ -210,7 +215,7 @@ def print_table(data, table_fields, align="l", style=None):
         table.add_row([d[v] if v in d else "" for v in values])
     click.echo(table)
 
-def handle_otp_error(err, callback):
+def handle_otp_error(err, method, path, args, kwargs):
     """Handle OTP authentication error by prompting the user and retrying the request."""
     try:
         response_body = json.loads(err.response.text)
@@ -218,7 +223,11 @@ def handle_otp_error(err, callback):
             otp_code = click.prompt('Enter your OTP code', type=int)
             os.environ["OKS_OTP_CODE"] = str(otp_code)
 
-            return callback()
+            logging.info("Retrying request with user-provided OTP...")
+            return do_request(method, path, *args, **kwargs)
+
+    except JSONClickException:
+        raise
     except Exception:
         return None
 
