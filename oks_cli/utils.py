@@ -1020,33 +1020,6 @@ def get_template(type):
 
     return template
 
-def get_netpeering_request_template():
-    """As NetPeeringRequest template is not yet supported by OKS API, we generate one from scratch as json document"""
-    netpeering_request_template = dict()
-    netpeering_request_template.update({
-        "apiVersion": "oks.dev/v1beta",
-        "kind": "NetPeeringRequest",
-        "metadata": {"name": None},
-        "spec": {
-            "accepterNetId": None,
-            "accepterOwnerId": None
-        }
-    })
-    return netpeering_request_template
-
-def get_netpeering_acceptance_template():
-    """As NetPeeringAcceptenace template is not yet supported by OKS API, we generate one from scratch as json document"""
-    netpeering_acceptance_template = dict()
-    netpeering_acceptance_template.update({
-        "apiVersion": "oks.dev/v1beta",
-        "kind": "NetPeeringAcceptance",
-        "metadata": {"name": None},
-        "spec": {
-            "netPeeringId": None
-        }
-    })
-    return netpeering_acceptance_template
-
 def ctx_update(ctx, project_name=None, cluster_name=None, profile=None, overwrite=True):
     """Update context with project, cluster, and profile; optionally prevent overwrites."""
     if not hasattr(ctx, 'obj') or not ctx.obj:
