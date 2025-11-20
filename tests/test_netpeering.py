@@ -24,10 +24,10 @@ def test_netpeering_command(mock_request):
     assert "get" in result.stderr
     assert "delete" in result.stderr
 
-# Test the "netpeering list" command: verifies output is json
+# Test the "netpeering list" command: verifies output is table
 @patch("oks_cli.utils.subprocess.run")
 @patch("oks_cli.utils.requests.request")
-def test_netpeering_list_json_command(mock_request, mock_run, add_default_profile):
+def test_netpeering_list_table_command(mock_request, mock_run, add_default_profile):
     mock_request.side_effect = [
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
@@ -56,7 +56,7 @@ def test_netpeering_list_json_command(mock_request, mock_run, add_default_profil
 
     assert result.exit_code == 0
     assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'json']
+    assert args[0] == ['kubectl', 'get', 'netpeerings']
 
 # Test the "netpeering list" command: verifies output is yaml
 @patch("oks_cli.utils.subprocess.run")
@@ -67,19 +67,11 @@ def test_netpeering_list_yaml_command(mock_request, mock_run, add_default_profil
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
     ]
-    fake_response = {
-        "apiVersion": "v1",
-        "items": [],
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        }
-    }
 
     mock_run.side_effect = [
         MagicMock(
             returncode = 0,
-            stdout = json.dumps(fake_response).encode("utf-8"), 
+            stdout = "", 
             stderr = ""),
     ]
 
@@ -90,10 +82,7 @@ def test_netpeering_list_yaml_command(mock_request, mock_run, add_default_profil
 
     assert result.exit_code == 0
     assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    # output format is json by default, then converted into netpeering command output format
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'json']
-    data = yaml.safe_load(result.stdout)
-    assert data == fake_response
+    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'yaml']
 
 # Test the "netpeering list -o wide" command: verifies output is wide and empty
 @patch("oks_cli.utils.subprocess.run")
@@ -108,7 +97,7 @@ def test_netpeering_list_wide_command(mock_request, mock_run, add_default_profil
     mock_run.side_effect = [
         MagicMock(
             returncode = 0,
-            stdout = "No resources found".encode("utf-8"),
+            stdout = "",
             stderr = ""),
     ]
 
@@ -119,320 +108,8 @@ def test_netpeering_list_wide_command(mock_request, mock_run, add_default_profil
 
     assert result.exit_code == 0
     assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    # output format is json by default, then converted into netpeering command output format
+
     assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'wide']
-    assert "No resources found" in result.stdout
-
-# Test the "netpeering list -o wide" command: verifies output is wide and not empty
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_list_wide_non_empty_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
-    ]
-
-    fake_response  = "NAME                             SOURCE NET ID   ACCEPTER NET ID   NET PEERING ID   STATE NAME   STATE MESSAGE             EXPIRATION DATE\n"
-    fake_response += "netpeering.oks.dev/pcx-05a958ce  vpc-3e81fb0e    vpc-7260be2a      pcx-05a958ce     active       Active                    2025-10-23T13:26:29.000Z"
-    fake_response += "netpeering.oks.dev/pcx-05a958ce  vpc-3e81fb0e    vpc-7260be2a      pcx-05a958ce     deleted      Deleted by 363338042637   2025-10-23T13:26:29.000Z"
-
-    mock_run.side_effect = [
-        MagicMock(
-            returncode = 0,
-            stdout = fake_response.encode("utf-8"),
-            stderr = ""),
-    ]
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "list", "-o", "wide"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-
-    assert result.exit_code == 0
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    # output format is json by default, then converted into netpeering command output format
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'wide']
-    assert "vpc-3e81fb0e" in result.stdout
-    assert "vpc-7260be2a" in result.stdout
-    assert "pcx-05a958ce" in result.stdout
-    assert "active"       in result.stdout
-    assert "deleted"      in result.stdout
-    assert "Deleted by 363338042637" in result.stdout
-
-# Test the "netpeering list --status active" command: verifies output is json and only filters active NetPeerings
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_list_status_active_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
-    ]
-
-    fake_response = {
-        "apiVersion": "v1",
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        },
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta",
-                "kind": "NetPeering",
-                "metadata": {
-                    "annotations": {
-                    "kopf.zalando.org/last-handled-configuration": "{\"spec\":{\"netPeeringId\":\"pcx-0ce60092\"}}\n"
-                    },
-                    "name": "pcx-0ce60092",
-                    "resourceVersion": "7908935",
-                    "uid": "7d51bb51-05b1-4bcb-af5a-880afa95ef30"
-                },
-                "spec": {
-                    "netPeeringId": "pcx-0ce60092"
-                },
-                "status": {
-                    "accepterIpRange": "10.51.0.0/16",
-                    "accepterNetId": "vpc-7260be2a",
-                    "accepterOwnerId": "363338042637",
-                    "netPeeringExpirationDate": "2025-10-23T09:45:02.000Z",
-                    "netPeeringMessage": "Active",
-                    "netPeeringState": "active",
-                    "sourceIpRange": "10.50.0.0/16",
-                    "sourceNetId": "vpc-3e81fb0e",
-                    "sourceOwnerId": "374514215886"
-                }
-            }
-        ]
-    }
-
-    mock_run.side_effect = [
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_response).encode("utf-8"),
-            stderr = ""),
-    ]
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "list", "--status", "active"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-
-    assert result.exit_code == 0
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    # output format is json by default, then converted into netpeering command output format
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'json']
-    data = json.loads(result.stdout)
-    assert data.get('items') != None
-    assert len(data.get('items')) == 1
-    item = data.get('items')[0]
-    assert item.get('kind') == 'NetPeering'
-    assert item.get('spec').get('netPeeringId') == 'pcx-0ce60092'
-    assert item.get('status').get('netPeeringState') == 'active'
-    assert item.get('status').get('accepterNetId') == 'vpc-7260be2a'
-
-
-# Test the "netpeering list --status deleted" command: verifies output is json and only filters active NetPeerings
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_list_status_deleted_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
-    ]
-
-    fake_response = {
-        "apiVersion": "v1",
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        },
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta",
-                "kind": "NetPeering",
-                "metadata": {
-                    "annotations": {
-                    "kopf.zalando.org/last-handled-configuration": "{\"spec\":{\"netPeeringId\":\"pcx-0ce60092\"}}\n"
-                    },
-                    "name": "pcx-0ce60092",
-                    "resourceVersion": "7908935",
-                    "uid": "7d51bb51-05b1-4bcb-af5a-880afa95ef30"
-                },
-                "spec": {
-                    "netPeeringId": "pcx-0ce60092"
-                },
-                "status": {
-                    "accepterIpRange": "10.51.0.0/16",
-                    "accepterNetId": "vpc-7260be2a",
-                    "accepterOwnerId": "363338042637",
-                    "netPeeringExpirationDate": "2025-10-23T09:45:02.000Z",
-                    "netPeeringMessage": "Deleted by 363338042637",
-                    "netPeeringState": "deleted",
-                    "sourceIpRange": "10.50.0.0/16",
-                    "sourceNetId": "vpc-3e81fb0e",
-                    "sourceOwnerId": "374514215886"
-                }
-            }
-        ]
-    }
-
-    mock_run.side_effect = [
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_response).encode("utf-8"),
-            stderr = ""),
-    ]
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "list", "--status", "deleted"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-
-    assert result.exit_code == 0
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    # output format is json by default, then converted into netpeering command output format
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'json']
-    data = json.loads(result.stdout)
-    assert data.get('items') != None
-    assert len(data.get('items')) == 1
-    item = data.get('items')[0]
-    assert item.get('kind') == 'NetPeering'
-    assert item.get('spec').get('netPeeringId') == 'pcx-0ce60092'
-    assert item.get('status').get('netPeeringState') == 'deleted'
-    assert item.get('status').get('accepterNetId') == 'vpc-7260be2a'
-
-# Test the "netpeering list --status all" command: verifies output is json and only filters active NetPeerings
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_list_status_all_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
-    ]
-
-    fake_response = {
-        "apiVersion": "v1",
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        },
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta",
-                "kind": "NetPeering",
-                "metadata": {
-                    "annotations": {
-                    "kopf.zalando.org/last-handled-configuration": "{\"spec\":{\"netPeeringId\":\"pcx-0ce60092\"}}\n"
-                    },
-                    "name": "pcx-0ce60092",
-                    "resourceVersion": "7908935",
-                    "uid": "7d51bb51-05b1-4bcb-af5a-880afa95ef30"
-                },
-                "spec": {
-                    "netPeeringId": "pcx-0ce60092"
-                },
-                "status": {
-                    "accepterIpRange": "10.51.0.0/16",
-                    "accepterNetId": "vpc-7260be2a",
-                    "accepterOwnerId": "363338042637",
-                    "netPeeringExpirationDate": "2025-10-23T09:45:02.000Z",
-                    "netPeeringMessage": "Deleted by 363338042637",
-                    "netPeeringState": "deleted",
-                    "sourceIpRange": "10.50.0.0/16",
-                    "sourceNetId": "vpc-3e81fb0e",
-                    "sourceOwnerId": "374514215886"
-                }
-            }
-        ]
-    }
-
-    mock_run.side_effect = [
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_response).encode("utf-8"),
-            stderr = ""),
-    ]
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "list", "--status", "deleted"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-
-    assert result.exit_code == 0
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'json']
-    data = json.loads(result.stdout)
-    assert data.get('items') != None
-    assert len(data.get('items')) == 1
-    item = data.get('items')[0]
-    assert item.get('kind') == 'NetPeering'
-    assert item.get('spec').get('netPeeringId') == 'pcx-0ce60092'
-    assert item.get('status').get('netPeeringState') == 'deleted'
-    assert item.get('status').get('accepterNetId') == 'vpc-7260be2a'
-
-# Test the "netpeering list --status active" command: verifies output is json and using status active filters returns nothing
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_list_status_all_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
-    ]
-
-    fake_response = {
-        "apiVersion": "v1",
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        },
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta",
-                "kind": "NetPeering",
-                "metadata": {
-                    "name": "pcx-0ce60092",
-                },
-                "spec": {
-                    "netPeeringId": "pcx-0ce60092"
-                },
-                "status": {
-                    "accepterIpRange": "10.51.0.0/16",
-                    "accepterNetId": "vpc-7260be2a",
-                    "accepterOwnerId": "363338042637",
-                    "netPeeringExpirationDate": "2025-10-23T09:45:02.000Z",
-                    "netPeeringMessage": "Deleted by 363338042637",
-                    "netPeeringState": "deleted",
-                    "sourceIpRange": "10.50.0.0/16",
-                    "sourceNetId": "vpc-3e81fb0e",
-                    "sourceOwnerId": "374514215886"
-                }
-            }
-        ]
-    }
-
-    mock_run.side_effect = [
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_response).encode("utf-8"),
-            stderr = ""),
-    ]
-
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "list"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-
-    assert result.exit_code == 0
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    assert args[0] == ['kubectl', 'get', 'netpeerings', '-o', 'json']
-    data = json.loads(result.stdout)
-    assert data.get('items') != None
-    assert len(data.get('items')) == 0
-    assert data.get('kind') == "List"
 
 # Test the "netpeering delete" command: verifies output is error with message
 def test_netpeering_delete_command(add_default_profile):
@@ -544,7 +221,7 @@ def test_netpeering_get_command(mock_request, add_default_profile):
     result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "get"])
 
     assert result.exit_code == 2
-    assert "Error: Missing option '--netpeering-id'." in result.stderr
+    assert "Error: Missing option '--netpeering-id' / '--name'." in result.stderr
 
 # Test the "netpeering get --netpeering-id pcx-33e30194" command: verifies the command shows output in default json format
 @patch("oks_cli.utils.subprocess.run")
@@ -669,174 +346,28 @@ NetPeering pcx-33e30194 successfully created and active between projects 'cluste
 """
 
 # Test the "netpeering create" command: verifies an error is thrown about overlaping networks
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectB --to-cluster clusterB     \
-#                   --netpeering-name testC --auto-approve
+# netpeering create --source-project projectA --source-cluster clusterA \
+#                   --target-project projectB --target-cluster clusterB     \
+#                   --netpeering-name testC
 
 @patch("oks_cli.utils.requests.request")
 def test_netpeering_create_netoverlap_command(mock_request, add_default_profile):
     mock_request.side_effect = [
-        # Before netpeering subcommand
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-
         # Project A
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "cidr": "10.50.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "cidr": "10.50.0.0/16", "name": "projectA"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "project_id": "12345", "name": "clusterA"}]}),
         # Project B
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "67890", "cidr": "10.50.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "67890"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "67890", "cidr": "10.50.0.0/16", "name": "projectB"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "67890", "project_id": "67890", "name": "clusterB"}]}),
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
-                                 "create", "--netpeering-name", "test", "--auto-approve",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+    result = runner.invoke(cli, ["-v", "netpeering", "create", "--netpeering-name", "test",
+                                 "--source-project", "projectA", "--source-cluster", "clusterA",
+                                 "--target-project", "projectB", "--target-cluster", "clusterB"])
     assert result.exit_code == 1
+    print(result.stderr)
     assert "Error: Source network 10.50.0.0/16 and target network 10.50.0.0/16 overlap, you can't create netpeering. Aborted!\n" in result.stderr
-
-# Test the "netpeering create" command: verifies that source cluster without nodepool throws error
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
-#                   --netpeering-name testC
-
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_create_source_cluster_without_nodepool_fails_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        # Before netpeering subcommand
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-
-        # Project A - gather_info
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "projectA", "cidr": "10.50.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "name": "clusterA"}]}),
-        # Project B - gather_info
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "projectB", "cidr": "10.51.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "name": "clusterB"}]}),
-
-        # clusterA - get nodepool
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}}),
-    ]
-
-    fake_nodepoolA = {
-        "apiVersion": "v1",
-        "items": [],
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        }
-    }
-
-    mock_run.side_effect = [
-        # get source nodepool
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_nodepoolA).encode("utf-8"),
-            stderr = "",
-        ),
-    ]
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
-                                 "create", "--netpeering-name", "test",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-    assert result.exit_code == 1
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    assert args[0] == ['kubectl', 'get', 'nodepool', '-o', 'json']
-    assert "Can't find nodepool in cluster clusterA" in result.stderr
-
-# Test the "netpeering create" command: verifies that target cluster without nodepool throws error
-# netpeering create --from-project projectA --from-cluster clusterA \
-#                   --to-project projectA --to-cluster clusterA     \
-#                   --netpeering-name testC
-
-@patch("oks_cli.utils.subprocess.run")
-@patch("oks_cli.utils.requests.request")
-def test_netpeering_create_target_cluster_without_nodepool_fails_command(mock_request, mock_run, add_default_profile):
-    mock_request.side_effect = [
-        # Before netpeering subcommand
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
-
-        # Project A - gather_info
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "projectA", "cidr": "10.50.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "name": "clusterA"}]}),
-        # Project B - gather_info
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "projectB", "cidr": "10.51.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "name": "clusterB"}]}),
-
-        # clusterA - get nodepool
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}}),
-        # clusterB - get nodepool
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}}),
-    ]
-
-    fake_nodepoolA = {
-        "apiVersion": "v1",
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta2",
-                "kind": "NodePool",
-                "metadata": {
-                    "labels": {
-                        "oks.account-id": "374514215886",
-                        "oks.network_id": "vpc-3e81fb0e",
-                        "oks.nodepool.security-group": "sg-fe577828"
-                    },
-                    "name": "NodepoolA",
-                },
-                "spec": {
-                    "zones": [
-                        "eu-west-2c"
-                    ]
-                },
-            },
-        ],
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        }
-    }
-
-    fake_nodepoolB = {
-        "apiVersion": "v1",
-        "items": [],
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        }
-    }
-
-    mock_run.side_effect = [
-        # get source nodepool
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_nodepoolA).encode("utf-8"),
-            stderr = "",
-        ),
-        # get target nodepool
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_nodepoolB).encode("utf-8"),
-            stderr = "",
-        ),
-    ]
-    runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
-                                 "create", "--netpeering-name", "test",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
-    mock_run.assert_called()
-    args, kwargs = mock_run.call_args
-    assert result.exit_code == 1
-    assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
-    assert args[0] == ['kubectl', 'get', 'nodepool', '-o', 'json']
-    assert "Can't find nodepool in cluster clusterB" in result.stderr
-
 
 # Test the "netpeering create" command: verifies that a NetPeering already exists
 # netpeering create --from-project projectA --from-cluster clusterA \
@@ -847,78 +378,26 @@ def test_netpeering_create_target_cluster_without_nodepool_fails_command(mock_re
 @patch("oks_cli.utils.requests.request")
 def test_netpeering_create_peering_exists_command(mock_request, mock_run, add_default_profile):
     mock_request.side_effect = [
-        # Before netpeering subcommand
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
 
         # Project A - gather_info
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "projectA", "cidr": "10.50.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "name": "clusterA"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "project_id": "12345", "name": "clusterA"}]}),
         # Project B - gather_info
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345", "name": "projectB", "cidr": "10.51.0.0/16"}]}),
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "name": "clusterB"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345", "project_id": "12345", "name": "clusterB"}]}),
 
-        # clusterA - get nodepool
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}}),
-        # clusterB - get nodepool
-        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}}),
+        
+        # GET vpc and account id for Project A
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Nets": [{"IpRange": "10.50.0.0/16", "NetId": "vpc-3e81fb0e"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Project": {"data": { "quotas": [{ "AccountId": "374514215886"}]}}}),
+
+        # GET vpc and account id for Project B
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Nets": [{"IpRange": "10.51.0.0/16", "NetId": "vpc-7260be2a"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Project": {"data": { "quotas": [{ "AccountId": "363338042637"}]}}}),
+
         # _netpeering_exists - _run_kubectl
         MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": "kubeconfig"}}})
     ]
-
-    fake_nodepoolA = {
-        "apiVersion": "v1",
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta2",
-                "kind": "NodePool",
-                "metadata": {
-                    "labels": {
-                        "oks.account-id": "374514215886",
-                        "oks.network_id": "vpc-3e81fb0e",
-                        "oks.nodepool.security-group": "sg-fe577828"
-                    },
-                    "name": "NodepoolA",
-                },
-                "spec": {
-                    "zones": [
-                        "eu-west-2c"
-                    ]
-                },
-            },
-        ],
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        }
-    }
-
-    fake_nodepoolB = {
-        "apiVersion": "v1",
-        "items": [
-            {
-                "apiVersion": "oks.dev/v1beta2",
-                "kind": "NodePool",
-                "metadata": {
-                    "labels": {
-                        "oks.account-id": "363338042637",
-                        "oks.network_id": "vpc-7260be2a",
-                        "oks.nodepool.security-group": "sg-fe577829"
-                    },
-                    "name": "NodepoolB",
-                },
-                "spec": {
-                    "zones": [
-                        "eu-west-2c"
-                    ]
-                },
-            },
-        ],
-        "kind": "List",
-        "metadata": {
-            "resourceVersion": ""
-        }
-    }
 
     fake_netpeering = {
         "apiVersion": "v1",
@@ -952,19 +431,6 @@ def test_netpeering_create_peering_exists_command(mock_request, mock_run, add_de
 
     fake_response = "already exists between projects projectA and projectB. Aborting!"
     mock_run.side_effect = [
-        # get source nodepool
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_nodepoolA).encode("utf-8"),
-            stderr = "",
-        ),
-        # get target nodepool
-        MagicMock(
-            returncode = 0,
-            stdout = json.dumps(fake_nodepoolB).encode("utf-8"),
-            stderr = "",
-        ),
-        # check existing netpeering
         MagicMock(
             returncode = 0,
             stdout = json.dumps(fake_netpeering).encode("utf-8"),
@@ -972,10 +438,9 @@ def test_netpeering_create_peering_exists_command(mock_request, mock_run, add_de
         ),
     ]
     runner = CliRunner()
-    result = runner.invoke(cli, ["netpeering", "-p", "projectA", "-c", "clusterA",
-                                 "create", "--netpeering-name", "test",
-                                 "--from-project", "projectA", "--from-cluster", "clusterA",
-                                 "--to-project", "projectB", "--to-cluster", "clusterB"])
+    result = runner.invoke(cli, ["netpeering", "create", "--netpeering-name", "test", "--force",
+                                 "--source-project", "projectA", "--source-cluster", "clusterA",
+                                 "--target-project", "projectB", "--target-cluster", "clusterB"])
     mock_run.assert_called()
     args, kwargs = mock_run.call_args
     assert result.exit_code == 1

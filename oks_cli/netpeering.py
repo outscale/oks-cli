@@ -13,54 +13,75 @@ from .cluster import _run_kubectl
 from json import JSONDecodeError
 
 @click.group(help="NetPeering related commands.")
-@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
+@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--user', type=click.STRING, help="User")
 @click.option('--group', type=click.STRING, help="Group")
 @click.pass_context
-def netpeering(ctx, profile, project_name, cluster_name, user, group):
+def netpeering(ctx, project_name, cluster_name, profile, user, group):
     """Group of commands related to netpeering management"""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
-    login_profile(profile)
 
-    ctx.obj['project_id'] = find_project_id_by_name(project_name)
-    ctx.obj['cluster_id'] = find_cluster_id_by_name(
-        ctx.obj['project_id'], cluster_name)
     ctx.obj['user'] = user
     ctx.obj['group'] = group
 
 @netpeering.command('list', help="List NetPeering from a project/cluster")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
+@click.option('--cluster-name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
+@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "wide"]), help="Specify output format")
 @click.pass_context
-def netpeering_list(ctx, output):
+def netpeering_list(ctx, project_name, cluster_name, profile, output):
     """List netpeering in the specified cluster"""
+    project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
+    login_profile(profile)
+
+    project_id = find_project_id_by_name(project_name)
+    cluster_id = find_cluster_id_by_name(project_id, cluster_name)
 
     cmd = ['get', 'netpeerings']
     if output:
         cmd.extend(['-o', output])
 
-    _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'], cmd)
+    _run_kubectl(project_id, cluster_id, ctx.obj['user'], ctx.obj['group'], cmd)
 
 
 @netpeering.command('get', help="Get information about a NetPeering")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
+@click.option('--cluster-name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
+@click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--netpeering-id', '--name', required=True, type=click.STRING, help="NetPeering to get information from")
 @click.option('--output', '-o', default='json', required=False, type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
 @click.pass_context
-def netpeering_get(ctx, netpeering_id, output):
+def netpeering_get(ctx, project_name, cluster_name, profile, netpeering_id, output):
     """Retrieve information about a NetPeering"""
+    project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
+    login_profile(profile)
 
-    _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
+    project_id = find_project_id_by_name(project_name)
+    cluster_id = find_cluster_id_by_name(project_id, cluster_name)
+
+    _run_kubectl(project_id, cluster_id, ctx.obj['user'], ctx.obj['group'],
                    ['get', 'netpeering', netpeering_id, '-o', output])
 
 
 @netpeering.command('delete', help="Delete a NetPeering from a project/cluster")
+@click.option('--project-name', '-p', required=False, type=click.STRING, help="Source project name to create netpeering from", shell_complete=project_completer)
+@click.option('--cluster-name', '-c', required=False, type=click.STRING, help="Source cluster to create netpeering from", shell_complete=cluster_completer)
 @click.option('--netpeering-id', '--name', required=True, type=click.STRING, help="NetPeering to remove")
 @click.option('--dry-run', required=False, is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def netpeering_delete(ctx, netpeering_id, dry_run, force):
+def netpeering_delete(ctx, project_name, cluster_name, netpeering_id, dry_run, force, profile):
     """Delete a NetPeering between 2 projects"""
+    project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
+    login_profile(profile)
+
+    project_id = find_project_id_by_name(project_name)
+    cluster_id = find_cluster_id_by_name(project_id, cluster_name)
+
     if dry_run:
         message = {"message": f"Dry run: The netpeering {netpeering_id} would be deleted."}
         print_output(message, 'json')
@@ -68,7 +89,7 @@ def netpeering_delete(ctx, netpeering_id, dry_run, force):
 
     if force or click.confirm(f"Are you sure you want to delete NetPeering with id {netpeering_id}?", abort=True):
         try:
-            cmd = _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'],
+            cmd = _run_kubectl(project_id, cluster_id, ctx.obj['user'], ctx.obj['group'],
                         ['delete', 'netpeering', netpeering_id], capture=True)
             if cmd.returncode:
                 raise click.ClickException(f"Could not delete NetPeering {netpeering_id}: {cmd.stderr.decode('utf-8')}")
