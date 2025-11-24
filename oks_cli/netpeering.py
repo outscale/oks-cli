@@ -1,5 +1,6 @@
 import click
 import json
+import yaml
 import time
 import ipaddress
 import uuid
@@ -10,7 +11,6 @@ from .utils import cluster_completer, print_output, find_project_id_by_name,   \
                    profile_completer, project_completer, find_project_by_name, \
                    do_request, get_cluster_name, get_project_name, get_template
 from .cluster import _run_kubectl
-from json import JSONDecodeError
 
 @click.group(help="NetPeering related commands.")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
@@ -204,6 +204,22 @@ def _create_netpeering_acceptance(name: str, netpeering_request_status: dict, ta
     if netpeering_acceptance_cmd.returncode:
         raise click.ClickException(f"Could not create NetPeeringAcceptance object {netpeering_id}: {netpeering_acceptance_cmd.stderr}")
 
+def _dry_run(name_nr: str, name_na: str, output: str):
+    netpeering_request = get_template("netpeeringrequest")
+    netpeering_request['metadata']['name'] = name_nr
+
+    netpeering_acceptance = get_template("netpeeringacceptance")
+    netpeering_acceptance['metadata']['name'] = name_na
+
+    manifests = [netpeering_request, netpeering_acceptance]
+
+    if output == "yaml":
+        # print multiple yaml, separated by --- (kubernetes friendly format for multiple manifests)
+        output_data = yaml.dump_all(manifests, sort_keys=False)
+        click.echo(output_data)
+    else:
+        print_output([netpeering_request, netpeering_acceptance], output)
+
 @netpeering.command('create', help="Create a NetPeering between 2 projects")
 @click.option('--project-name', '--source-project', '-p', required=False, type=click.STRING, help="Source project name to create netpeering from", shell_complete=project_completer)
 @click.option('--cluster-name', '--source-cluster', '-c', required=False, type=click.STRING, help="Source cluster to create netpeering from", shell_complete=cluster_completer)
@@ -230,6 +246,18 @@ def netpeering_create(ctx, project_name, cluster_name, target_project, target_cl
     source = _gather_info(project=project_name, cluster=cluster_name)
     target = _gather_info(project=target_project, cluster=target_cluster)
 
+    # Generate name
+    if not netpeering_name:
+        netpeering_name = f"{source.get('project_name')}-to-{target.get('project_name')}"
+
+    netpeering_name += f"-{str(uuid.uuid4().fields[-1])[:6]}"
+    netpeering_request_name = f"{netpeering_name}-npr"
+    netpeering_acceptance_name = f"{netpeering_name}-npa"
+
+    if dry_run:
+        _dry_run(netpeering_request_name, netpeering_acceptance_name, output)
+        return
+
     source_cidr = ipaddress.ip_network(source.get('project_cidr'))
     target_cidr = ipaddress.ip_network(target.get('project_cidr'))
 
@@ -248,15 +276,6 @@ def netpeering_create(ctx, project_name, cluster_name, target_project, target_cl
     if _netpeering_exists(source=source, target=target, user=user, group=group):
         raise click.ClickException(f"A NetPeering already exists between projects {source.get('project_name')} and {target.get('project_name')}. Aborting!")
 
-    # Generate name
-    if not netpeering_name:
-        netpeering_name = f"{source.get('project_name')}-to-{target.get('project_name')}"
-
-    netpeering_name += f"-{str(uuid.uuid4().fields[-1])[:6]}"
-    netpeering_request_name = f"{netpeering_name}-npr"
-    netpeering_acceptance_name = f"{netpeering_name}-npa"
-
-    
     if not force and \
         not click.confirm(f"Are you sure you want to create NetPeering between projects {source.get('project_name')} and {target.get('project_name')}?", abort=False):
         return "Abort."
