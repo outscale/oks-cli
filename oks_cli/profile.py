@@ -18,7 +18,7 @@ def profile():
 @click.option('--password', required=False, help="Password", type=click.STRING)
 @click.option('--region', required=True, help="Region name", type=click.Choice(['eu-west-2', 'cloudgouv-eu-west-1']))
 @click.option('--endpoint', required=False, help="API endpoint", type=click.STRING)
-@click.option('--jwt', help="Enable JWT, by default is false")
+@click.option('--jwt', help="Enable JWT, by default is false", type=click.BOOL)
 def add_profile(profile_name, access_key, secret_key, username, password, region, endpoint, jwt):
     """Add a new profile with AK/SK or username/password authentication."""
     if not profile_name:
