@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 from oks_cli.main import cli
-
+from unittest.mock import patch
 
 def test_profile_list_command():
     runner = CliRunner()
@@ -37,6 +37,32 @@ def test_profile_add_command():
     result = runner.invoke(cli, ["profile", "add", "--region", "eu-west-2", "--access-key", "AK", "--secret-key", "SK"])
     assert result.exit_code == 0
     assert "Profile default has been successfully added" in result.output
+
+def test_profile_add_jwt_boolean():
+    runner = CliRunner()
+
+    with patch("oks_cli.profile.set_profile") as mock_set_profile:
+        result = runner.invoke(
+            cli,
+            [
+                "profile", "add",
+                "--region", "eu-west-2",
+                "--access-key", "AK",
+                "--secret-key", "SK",
+                "--jwt", "true"
+            ],
+            input="y\n"
+        )
+
+        assert result.exit_code == 0
+
+        mock_set_profile.assert_called_once()
+        profile_name, obj = mock_set_profile.call_args[0]
+
+        assert profile_name == "default"
+
+        assert isinstance(obj["jwt"], bool)
+        assert obj["jwt"] is True
 
 def test_profile_update_command(add_default_profile):
     runner = CliRunner()
