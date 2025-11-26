@@ -352,7 +352,8 @@ def project_get_quotas(ctx, project_name, output, profile):
                                      ["Collection", "QuotaCollection"],
                                      ["Description", "ShortDescription"],
                                      ["Max Value", "MaxValue"],
-                                     ["Used Value", "UsedValue"]])
+                                     ["Used Value", "UsedValue"],
+                                     ["AccountId", "AccountId"]])
         print_table(data["subregions"], [["Region", "RegionName"],
                                          ["Availability Zone", "SubregionName"],
                                          ["State", "State"]])
