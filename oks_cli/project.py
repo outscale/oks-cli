@@ -63,7 +63,7 @@ def project_logout(ctx, profile):
 # LIST PROJECTS
 @project.command('list', help="List all projects")
 @click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
-@click.option('--deleted', '-x', is_flag=True, help="List deleted projects")
+@click.option('--deleted', '-x', is_flag=True, deprecated="List deleted projects - Will be removed")
 @click.option('--plain', is_flag=True, help="Plain table format")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--uuid', is_flag=True, help="Show UUID")
