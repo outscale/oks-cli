@@ -16,8 +16,8 @@ from .cluster import _run_kubectl
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
-@click.option('--user', type=click.STRING, help="User")
-@click.option('--group', type=click.STRING, help="Group")
+@click.option('--user', type=click.STRING, help="User for the kubeconfig of the source cluster")
+@click.option('--group', type=click.STRING, help="Group for the kubeconfig of the source cluster")
 @click.pass_context
 def netpeering(ctx, project_name, cluster_name, profile, user, group):
     """Group of commands related to netpeering management"""
@@ -228,8 +228,8 @@ def _dry_run(name_nr: str, name_na: str, output: str):
 @click.option('--netpeering-name', required=False, type=click.STRING, help="Name of the NetPeeringRequest, default to '{from-project}-to-{to-project}",
               default=None)
 @click.option('--force', required=False, is_flag=True, help="Create netpeering resources without confirmation")
-@click.option('--user', type=click.STRING, help="User")
-@click.option('--group', type=click.STRING, help="Group")
+@click.option('--user', type=click.STRING, help="User for the kubeconfig of the source cluster")
+@click.option('--group', type=click.STRING, help="Group for the kubeconfig of the source cluster")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
 @click.option('--output', '-o', type=click.Choice(['json', 'yaml']), default="json", help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
