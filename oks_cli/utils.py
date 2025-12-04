@@ -283,8 +283,14 @@ def find_cluster_id_by_name(project_id, cluster_name):
     """Retrieve the cluster ID by name within a given project, or use the default cluster if none is provided."""
     if not cluster_name:
         cluster_id = get_cluster_id()
+        errors = {"Error": "--cluster-name must be specified, or a default cluster must be set"}
+
         if not cluster_id:
-            raise click.BadParameter("--cluster-name must be specified, or a default cluster must be set")
+            raise JSONClickException(json.dumps(errors))
+
+        cluster = do_request("GET", f'clusters/{cluster_id}')
+        if cluster['project_id'] != project_id:
+            raise JSONClickException(json.dumps(errors))
     else:
         data = do_request("GET", 'clusters', params={"project_id": project_id, "name": cluster_name})
         if len(data) != 1:

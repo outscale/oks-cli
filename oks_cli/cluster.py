@@ -257,6 +257,9 @@ def cluster_get_command(ctx, project_name, cluster_name, output, profile):
 def prepare_cluster_template(cluster_config):
     cluster_template = get_template("cluster")
 
+    if cluster_template.get("project_id") == "":
+        cluster_template.pop("project_id", None)
+
     admin_whitelist = cluster_config.get("admin_whitelist") or []
     if isinstance(admin_whitelist, str):
         admin_whitelist = [admin_whitelist]
