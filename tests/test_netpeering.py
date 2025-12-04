@@ -221,7 +221,7 @@ def test_netpeering_get_command(mock_request, add_default_profile):
     result = runner.invoke(cli, ["netpeering", "-p", "test", "-c", "test", "get"])
 
     assert result.exit_code == 2
-    assert "Error: Missing option '--netpeering-id' / '--name'." in result.stderr
+    assert "Error: Missing option '--netpeering-id'." in result.stderr
 
 # Test the "netpeering get --netpeering-id pcx-33e30194" command: verifies the command shows output in default json format
 @patch("oks_cli.utils.subprocess.run")

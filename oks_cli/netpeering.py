@@ -51,7 +51,7 @@ def netpeering_list(ctx, project_name, cluster_name, profile, output):
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option("--profile", help="Configuration profile to use", shell_complete=profile_completer)
-@click.option('--netpeering-id', '--name', required=True, type=click.STRING, help="NetPeering to get information from")
+@click.option('--netpeering-id', required=True, type=click.STRING, help="NetPeering to get information from")
 @click.option('--output', '-o', default='json', required=False, type=click.Choice(["json", "yaml", "wide"]), help="Specify output format, default json")
 @click.pass_context
 def netpeering_get(ctx, project_name, cluster_name, profile, netpeering_id, output):
@@ -69,7 +69,7 @@ def netpeering_get(ctx, project_name, cluster_name, profile, netpeering_id, outp
 @netpeering.command('delete', help="Delete a NetPeering from a project/cluster")
 @click.option('--project-name', '-p', required=False, type=click.STRING, help="Source project name to create netpeering from", shell_complete=project_completer)
 @click.option('--cluster-name', '-c', required=False, type=click.STRING, help="Source cluster to create netpeering from", shell_complete=cluster_completer)
-@click.option('--netpeering-id', '--name', required=True, type=click.STRING, help="NetPeering to remove")
+@click.option('--netpeering-id', required=True, type=click.STRING, help="NetPeering to remove")
 @click.option('--dry-run', required=False, is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
