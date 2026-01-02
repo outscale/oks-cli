@@ -822,8 +822,21 @@ def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, 
 
 @nodepool.command('delete')
 @click.option('--nodepool-name', '-n', required=True, help="Nodepool Name")
+@click.option('--force', is_flag=True, help="Delete without confirmation")
 @click.pass_context
-def delete_worker_pool(ctx, nodepool_name):
+def delete_worker_pool(ctx, nodepool_name, force):
     """Delete a nodepool by name from the cluster."""
-    _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'], [
-                 'delete', 'nodepool', nodepool_name])
+
+    if not force:
+        click.confirm(
+            f"Are you sure you want to delete the nodepool '{nodepool_name}'?",
+            abort=True
+        )
+
+    _run_kubectl(
+        ctx.obj['project_id'],
+        ctx.obj['cluster_id'],
+        ctx.obj['user'],
+        ctx.obj['group'],
+        ['delete', 'nodepool', nodepool_name]
+    )
