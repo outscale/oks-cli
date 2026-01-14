@@ -23,7 +23,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, format_row
+                   kubeconfig_parse_fields, print_table, format_row, apply_set_fields
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -371,8 +371,9 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
-def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, cp_multi_az, dry_run, output, filename, profile):
+def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, cp_multi_az, dry_run, output, filename, profile, set_fields):
     """CLI command to create a new Kubernetes cluster with optional configuration parameters."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -443,6 +444,8 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
     if cp_multi_az is not None:
         cluster_config["cp_multi_az"] = cp_multi_az
 
+    apply_set_fields(cluster_config, set_fields)
+
     if not dry_run:
         _create_cluster(project_name, cluster_config, output)
     else:
@@ -466,8 +469,9 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to update the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
-def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, dry_run, output, filename, profile):
+def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, dry_run, output, filename, profile, set_fields):
     """CLI command to update an existing Kubernetes cluster with new configuration options."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -545,6 +549,8 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
 
     if control_plane:
         cluster_config['control_planes'] = control_plane
+    
+    apply_set_fields(cluster_config, set_fields)
 
     if dry_run:
         print_output(cluster_config, output)

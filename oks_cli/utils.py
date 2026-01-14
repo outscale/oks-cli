@@ -1071,3 +1071,40 @@ def is_interesting_status(status):
     """Check if status is in the list of interesting statuses."""
     interesting_statuses = ["pending", "deploying", "updating", "upgrading", "deleting"]
     return status in interesting_statuses
+
+def parse_value(value):
+    value = value.strip()
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    if ',' in value:
+        return [v.strip() for v in value.split(',')]
+    return value
+
+def apply_set_fields(target: dict, set_fields):
+    for field in set_fields:
+        if '=' not in field:
+            raise click.ClickException(
+                f"Malformed --set argument: '{field}' (expected key=value)"
+            )
+
+        key_path, value_str = field.split('=', 1)
+        key_parts = key_path.split('.')
+        value = parse_value(value_str)
+
+        current = target
+        for part in key_parts[:-1]:
+            if part not in current or not isinstance(current[part], dict):
+                current[part] = {}
+            current = current[part]
+
+        current[key_parts[-1]] = value
