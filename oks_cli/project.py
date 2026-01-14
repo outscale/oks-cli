@@ -10,7 +10,7 @@ from prettytable import TableStyle
 from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, \
                    detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, \
                    format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer, \
-                   format_row
+                   format_row, apply_set_fields
 
 # DEIFNE THE PROJECT COMMAND GROUP
 @click.group(help="Project related commands.")
@@ -188,8 +188,9 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "silent"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the project")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
-def project_create(ctx, project_name, description, cidr, quirk, tags, disable_api_termination, dry_run, output, filename, profile):
+def project_create(ctx, project_name, description, cidr, quirk, tags, disable_api_termination, dry_run, output, filename, profile, set_fields):
     """Create a new project from options or file, with support for dry-run and output formatting."""
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
@@ -230,6 +231,8 @@ def project_create(ctx, project_name, description, cidr, quirk, tags, disable_ap
 
     if disable_api_termination is not None:
         project_config["disable_api_termination"] = disable_api_termination
+    
+    apply_set_fields(project_config, set_fields)
 
     if not dry_run:
         data = do_request("POST", 'projects', json=project_config)
@@ -295,8 +298,9 @@ def project_delete_command(ctx, project_name, output, dry_run, force, profile):
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
-def project_update_command(ctx, project_name, description, quirk, tags, disable_api_termination, output, dry_run, profile):
+def project_update_command(ctx, project_name, description, quirk, tags, disable_api_termination, output, dry_run, profile, set_fields):
     """Update project details by name, supporting dry-run and output formatting."""
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
@@ -326,6 +330,8 @@ def project_update_command(ctx, project_name, description, quirk, tags, disable_
                 parsed_tags[key.strip()] = value.strip()
 
         project_config['tags'] = parsed_tags
+    
+    apply_set_fields(project_config, set_fields)
 
     if dry_run:
         print_output(project_config, output)
