@@ -1072,22 +1072,37 @@ def is_interesting_status(status):
     interesting_statuses = ["pending", "deploying", "updating", "upgrading", "deleting"]
     return status in interesting_statuses
 
+def normalize_key_path(key_path: str) -> str:
+    return re.sub(r'\[(\d+)\]', r'.\1', key_path)
+
 def parse_value(value):
     value = value.strip()
+
+    # Inline list: [a,b,c]
+    if value.startswith('[') and value.endswith(']'):
+        inner = value[1:-1].strip()
+        if not inner:
+            return []
+        return [parse_value(v.strip()) for v in inner.split(',')]
+
     if value.lower() == "true":
         return True
     if value.lower() == "false":
         return False
+
     try:
         return int(value)
     except ValueError:
         pass
+
     try:
         return float(value)
     except ValueError:
         pass
+
     if ',' in value:
-        return [v.strip() for v in value.split(',')]
+        return [parse_value(v) for v in value.split(',')]
+
     return value
 
 def apply_set_fields(target: dict, set_fields):
@@ -1097,14 +1112,38 @@ def apply_set_fields(target: dict, set_fields):
                 f"Malformed --set argument: '{field}' (expected key=value)"
             )
 
-        key_path, value_str = field.split('=', 1)
+        raw_key, value_str = field.split('=', 1)
+        key_path = normalize_key_path(raw_key)
         key_parts = key_path.split('.')
         value = parse_value(value_str)
 
         current = target
-        for part in key_parts[:-1]:
-            if part not in current or not isinstance(current[part], dict):
-                current[part] = {}
-            current = current[part]
+        for i, part in enumerate(key_parts[:-1]):
+            next_part = key_parts[i + 1]
 
-        current[key_parts[-1]] = value
+            is_index = part.isdigit()
+            next_is_index = next_part.isdigit()
+
+            if is_index:
+                idx = int(part)
+                if not isinstance(current, list):
+                    current_parent = []
+                    current[:] = current_parent  # if needed
+                while len(current) <= idx:
+                    current.append({})
+                current = current[idx]
+            else:
+                if part not in current:
+                    current[part] = [] if next_is_index else {}
+                current = current[part]
+
+        last = key_parts[-1]
+        if last.isdigit():
+            idx = int(last)
+            if not isinstance(current, list):
+                current[last] = []
+            while len(current) <= idx:
+                current.append(None)
+            current[idx] = value
+        else:
+            current[last] = value
