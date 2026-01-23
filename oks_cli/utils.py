@@ -920,7 +920,7 @@ def install_completions(shell_type):
             shell_name = result.stdout.strip()
 
             shell_type = os.path.basename(shell_name).lstrip('-')
-        except subprocess.SubProcessError:
+        except subprocess.SubprocessError:
             click.echo("Failed to determine shell type, please specify it by --type")
 
     completion_dir = os.path.join(home, ".oks_cli", "completions")
