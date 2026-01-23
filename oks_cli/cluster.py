@@ -504,7 +504,7 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
                         raise click.ClickException(f"Unable to resolve 'my-ip': {e}")
                 else:
                     resolved_ips.append(ip)
-            cluster_config['admin_whitelist'] = resolved_ips
+            cluster_config['admin_whitelist'] = list(dict.fromkeys(resolved_ips))
 
     if version is not None:
         cluster_config['version'] = version
