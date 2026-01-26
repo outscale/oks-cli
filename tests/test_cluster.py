@@ -188,7 +188,7 @@ def test_cluster_create_all_args(mock_get_template, mock_request, add_default_pr
         MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Cluster": {"id": "12345", "name": "test"}}),
     ]
 
-    mock_get_template.return_value = {}
+    mock_get_template.return_value = {"cp_multi_az": False}
 
     runner = CliRunner()
     result = runner.invoke(cli, [
