@@ -440,7 +440,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
     if disable_api_termination is not None:
         cluster_config["disable_api_termination"] = disable_api_termination
     
-    if cp_multi_az is not None:
+    if cp_multi_az:
         cluster_config["cp_multi_az"] = cp_multi_az
 
     if not dry_run:
