@@ -462,12 +462,14 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--quirk', '-q', multiple=True, help="Quirk")
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
 @click.option('--control-plane', shell_complete=shell_completions, help="Controlplane plan")
+@click.option('--zone', '-z', multiple=True, shell_complete=shell_completions, help="List of Control Plane availability zones")
+@click.option('--cp-multi-az', '-m', is_flag=True, help="Enable control plane multi AZ")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
 @click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to update the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, dry_run, output, filename, profile):
+def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, zone, cp_multi_az, dry_run, output, filename, profile):
     """CLI command to update an existing Kubernetes cluster with new configuration options."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -545,6 +547,15 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
 
     if control_plane:
         cluster_config['control_planes'] = control_plane
+    
+    if zone is not None and len(zone) > 0:
+        cluster_config['cp_subregions'] = list(zone)
+
+        if len(zone) > 1:
+            cluster_config['cp_multi_az'] = True
+
+    if cp_multi_az:
+        cluster_config['cp_multi_az'] = True
 
     if dry_run:
         print_output(cluster_config, output)
