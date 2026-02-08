@@ -1,0 +1,20 @@
+site_name: oks-cli
+site_description: A command line to manage Kubernetes clusters on top of OUTSCALE infrastructure
+site_author: OUTSCALE
+copyright: OUTSCALE
+nav:
+  - Home: index.md
+  - Installation: install.md
+  - Commands: commands.md
+  - Contributing: contributing.md
+  - Links: links.md
+
+theme:
+  name: material
+strict: true
+markdown_extensions:
+  - attr_list
+  - mkdocs-click
+
+plugins:
+  - search
