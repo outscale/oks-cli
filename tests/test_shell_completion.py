@@ -9,7 +9,7 @@ def test_install_completion_zsh():
 
     result = runner.invoke(cli, ["install-completion", "--type", "zsh"])
     assert result.exit_code == 0
-    assert "Autocompletion installed for zsh" in result.output
+    assert "To activate autocompletion on login please add following lines into your .profile or .zshrc file" in result.output
 
     completion_file = Path("~/.oks_cli/completions/oks-cli.sh").expanduser()
     assert completion_file.exists()
@@ -22,7 +22,7 @@ def test_install_completion_bash():
 
     result = runner.invoke(cli, ["install-completion", "--type", "bash"])
     assert result.exit_code == 0
-    assert "Autocompletion installed for bash" in result.output
+    assert "To activate autocompletion on login please add following lines into your .bash_profile or .bashrc file" in result.output
 
     completion_file = Path("~/.oks_cli/completions/oks-cli.sh").expanduser()
     assert completion_file.exists()
