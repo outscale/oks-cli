@@ -917,7 +917,11 @@ def find_shell_profile(home, shell_type):
         if os.path.exists(bash_profile) and os.path.exists(bashrc):
             return None
 
-        shell_profile = bash_profile or bashrc
+        if os.path.exists(bash_profile):
+            shell_profile = bash_profile
+
+        if os.path.exists(bashrc):
+            shell_profile = bashrc
 
     elif shell_type == "zsh":
 
@@ -927,7 +931,11 @@ def find_shell_profile(home, shell_type):
         if os.path.exists(zshrc) and os.path.exists(profile):
             return None
 
-        shell_profile = zshrc or profile
+        if os.path.exists(zshrc):
+            shell_profile = zshrc
+
+        if os.path.exists(profile):
+            shell_profile = profile
 
     return shell_profile
 
