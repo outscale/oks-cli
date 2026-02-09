@@ -404,7 +404,7 @@ def project_get_public_ips(ctx, project_name, output, profile):
 # GET NETS BY PROJECT NAME
 @project.command('nets', help="Get project nets")
 @click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
-@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml", "table"]), help="Specify output format, by default is json")
 @click.option('--profile',help="Configuration profile to use")
 @click.pass_context
 def project_get_public_ips(ctx, project_name, output, profile):
@@ -415,4 +415,11 @@ def project_get_public_ips(ctx, project_name, output, profile):
     project_id = find_project_id_by_name(project_name)
 
     data = do_request("GET", f'projects/{project_id}/nets')
-    print_output(data, output)
+    if output == "table":
+        print_table(data, [["DHCP options set id", "DhcpOptionsSetId"],
+                                     ["Ip range", "IpRange"],
+                                     ["Net id", "NetId"],
+                                     ["State", "State"],
+                                     ["Tenancy", "Tenancy"]])
+    else:
+        print_output(data, output)
