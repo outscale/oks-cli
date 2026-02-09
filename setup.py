@@ -26,7 +26,7 @@ setup(
     install_requires=[
         "certifi>=2024.8.30",
         "charset-normalizer>=3.3.2",
-        "click>=8.1.7,<8.3.0",
+        "click>=8.2.0,<8.3.0",
         "colorama>=0.4.6",
         "idna>=3.10",
         "pyyaml>=6.0.2",
