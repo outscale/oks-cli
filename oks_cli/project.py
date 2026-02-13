@@ -56,6 +56,13 @@ def project_logout(ctx, profile):
     """Unset the current default project and log out."""
     _, _, profile = ctx_update(ctx, None, None, profile)
     login_profile(profile)
+    
+    current_project = get_project_id()
+    
+    if not current_project:
+        click.echo("You are not connected to any project.")
+        return
+
     set_project_id("")
     set_cluster_id("")
     click.echo("Logged out from the current project")
