@@ -74,6 +74,13 @@ def cluster_logout(ctx, profile):
     """Clear the current default cluster selection."""
     _, _, profile = ctx_update(ctx, None, None, profile)
     login_profile(profile)
+    
+    current_cluster = get_cluster_id() 
+
+    if not current_cluster:
+        click.echo("You are not connected to any cluster.")
+        return
+    
     set_cluster_id("")
     click.echo("Logged out from the current cluster")
 
