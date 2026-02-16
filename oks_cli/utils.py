@@ -1097,30 +1097,19 @@ def is_interesting_status(status):
 def normalize_key_path(key_path: str) -> str:
     return re.sub(r'\[(\d+)\]', r'.\1', key_path)
 
-def parse_value(value):
+def parse_value(value: str):
     value = value.strip()
 
-    # Inline list: [a,b,c]
-    if value.startswith('[') and value.endswith(']'):
-        inner = value[1:-1].strip()
-        if not inner:
-            return []
-        return [parse_value(v.strip()) for v in inner.split(',')]
+    try:
+        return json.loads(value)
+    except Exception:
+        pass
 
     if value.lower() == "true":
         return True
     if value.lower() == "false":
         return False
 
-    try:
-        return int(value)
-    except ValueError:
-        pass
-
-    try:
-        return float(value)
-    except ValueError:
-        pass
 
     if ',' in value:
         return [parse_value(v) for v in value.split(',')]
