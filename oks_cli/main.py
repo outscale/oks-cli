@@ -47,7 +47,7 @@ def cli(ctx, project_name, cluster_name, profile, verbose):
         click.echo(ctx.get_help())
 
     if not hasattr(ctx, 'obj') or not ctx.obj:
-        ctx.obj = dict()
+        ctx.obj = {}
 
     if project_name != None:
         ctx.obj['project_name'] = project_name

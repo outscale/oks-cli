@@ -202,8 +202,8 @@ def print_table(data, table_fields, align="l", style=None):
     table.align = align
     if style and isinstance(style, prettytable.TableStyle):
         table.set_style(style)
-    fields = list()
-    values = list()
+    fields = []
+    values = []
 
     for d in table_fields:
         fields.append(d[0])
@@ -805,14 +805,14 @@ def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
     group: user group name of this kubeconfig (if set)
     """
     kubeconfig_str = yaml.safe_load(kubeconfig)
-    kubedata = list()
+    kubedata = []
 
     # Ensure loaded YAML returnes a valid dict object
     if not isinstance(kubeconfig_str, dict):
         return kubedata
 
     for context in kubeconfig_str.get('contexts', []):
-        data = dict()
+        data = {}
         ctx_cluster = context.get('context').get('cluster', None)
         ctx_user = context.get('context').get('user', None)
         ctx_name = context.get('name')
@@ -1037,7 +1037,7 @@ def get_template(type):
 def ctx_update(ctx, project_name=None, cluster_name=None, profile=None, overwrite=True):
     """Update context with project, cluster, and profile; optionally prevent overwrites."""
     if not hasattr(ctx, 'obj') or not ctx.obj:
-        ctx.obj = dict()
+        ctx.obj = {}
 
     if project_name is not None:
         if ctx.obj.get('project_name') and not overwrite:
