@@ -122,7 +122,7 @@ def list_profiles(output):
         return click.echo("There are no profiles")
 
     profiles_keys = list(profiles.keys())
-    lines = list()
+    lines = []
 
     for key in profiles_keys:
         if 'endpoint' not in profiles[key]:
