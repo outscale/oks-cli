@@ -417,7 +417,7 @@ def format_row(data: dict, name: str, is_default: bool):
     """Parse status and dates from a cluster of project object and returns elements"""
 
     if not data.get('status'):
-        raise click.ClickException(f"Can't find 'status' in project/cluster data")
+        raise click.ClickException("Can't find 'status' in project/cluster data")
 
     status = data.get('status')
     if status == 'ready':

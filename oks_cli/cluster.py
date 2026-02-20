@@ -523,7 +523,7 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
     if tags is not None:
         parsed_tags = {}
 
-        if not len(tags) == 0:
+        if len(tags) != 0:
             pairs = tags.split(',')
             for pair in pairs:
                 if '=' not in pair:
