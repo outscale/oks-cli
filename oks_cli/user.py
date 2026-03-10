@@ -1,19 +1,14 @@
 import click
-import time
 from datetime import datetime
 import dateutil.parser
 import human_readable
 import prettytable
 import json
-import os
-from prettytable import TableStyle
+
 from nacl.public import PrivateKey, SealedBox
 from nacl.encoding import Base64Encoder
 
-from .utils import do_request, print_output, print_table, find_project_id_by_name, get_project_id, set_project_id, \
-                   detect_and_parse_input, transform_tuple, ctx_update, set_cluster_id, get_template, get_project_name, \
-                   format_changed_row, is_interesting_status, login_profile, profile_completer, project_completer, \
-                   format_row, apply_set_fields
+from .utils import do_request, print_output, find_project_id_by_name, ctx_update, login_profile, profile_completer, project_completer, JSONClickException
 
 # DEIFNE THE USER COMMAND GROUP
 @click.group(help="EIM users related commands.")
@@ -111,11 +106,21 @@ def user_create(ctx, project_name, output, profile, user, ttl, nacl):
         )
 
         decrypted = unsealbox.decrypt(
-            raw_data.encode('ascii'),
+            raw_data.get("Data").encode('ascii'),
             encoder=Base64Encoder
         ).decode('ascii')
 
         data = json.loads(decrypted)
+
+        # format decrypted errors the same way as the api errors.
+        if "Errors" in data:
+            response_context = raw_data.get("ResponseContext")
+            errors = []
+            for error in data.get("Errors", []):
+                error["Code"] = str(data.get("Code"))
+                errors.append(error)
+
+            raise JSONClickException(json.dumps({"Errors": errors,"ResponseContext": response_context}, separators=(",", ":")))
 
     else:
         data = do_request(
