@@ -17,7 +17,6 @@ from .utils import do_request, print_output, print_table, find_project_id_by_nam
 
 # DEIFNE THE USER COMMAND GROUP
 @click.group(help="EIM users related commands.")
-@click.option('--project', 'project_name', required = False, help="Project Name")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
@@ -27,13 +26,12 @@ def user(ctx, project_name, profile):
 
 # LIST USERS
 @user.command('list', help="List EIM users")
-@click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
-@click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
-def user_list(ctx, project_name, output, profile):
+def user_list(ctx, output, profile):
     """List users"""
-    project_name, _, profile = ctx_update(ctx, project_name, None, profile)
+    _, _, profile = ctx_update(ctx, None, None, profile)
     login_profile(profile)
 
     project_id = get_project_id()
@@ -44,17 +42,18 @@ def user_list(ctx, project_name, output, profile):
     if output:
         print_output(data, output)
         return
-
-    field_names = ["USER", "EMAIL", "USER ID", "CREATED"]
-
+    field_names = ["USER", "ACCESS KEY ID", "STATE", "EXPIRATION DATE", "CREATED"]
     table = prettytable.PrettyTable()
     table.field_names = field_names
 
     for user in data:
+        access_keys = user.get("AccessKeys", [])
+        access_key = access_keys[0] if access_keys else {}
         row = [
             user.get("UserName"),
-            user.get("UserEmail"),
-            user.get("UserId"),
+            access_key.get("AccessKeyId", "N/A"),
+            access_key.get("State", "N/A"),
+            access_key.get("ExpirationDate", "N/A"),
             user.get("CreationDate"),
         ]
         table.add_row(row)
