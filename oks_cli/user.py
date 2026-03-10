@@ -35,7 +35,7 @@ def user_list(ctx, output, project_name, profile):
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
 
-    project_id = get_project_id()
+    project_id = find_project_id_by_name(project_name)
 
     data = do_request("GET", f'projects/{project_id}/eim_users')
 
@@ -87,7 +87,7 @@ def user_create(ctx, project_name, output, profile, user, ttl, nacl):
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
 
-    project_id = get_project_id()
+    project_id = find_project_id_by_name(project_name)
 
     params = {
         "user": user
