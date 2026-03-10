@@ -1,6 +1,6 @@
 import click
 import time
-import datetime
+from datetime import datetime
 import dateutil.parser
 import human_readable
 import prettytable
@@ -37,25 +37,37 @@ def user_list(ctx, output, project_name, profile):
 
     project_id = get_project_id()
 
-
     data = do_request("GET", f'projects/{project_id}/eim_users')
 
     if output:
         print_output(data, output)
         return
-    field_names = ["USER", "ACCESS KEY ID", "STATE", "EXPIRATION DATE", "CREATED"]
+
+    field_names = ["USER", "ACCESS KEY", "STATE", "CREATED", "EXPIRATION DATE"]
     table = prettytable.PrettyTable()
     table.field_names = field_names
 
     for user in data:
         access_keys = user.get("AccessKeys", [])
         access_key = access_keys[0] if access_keys else {}
+
+
+        state =  access_key.get("State", "N/A")
+        if state == 'ACTIVE':
+            state = click.style(state, fg='green')
+        elif state == "INACTIVE":
+            state = click.style(state, fg='red')
+
+        created_at = dateutil.parser.parse(user.get("CreationDate"))
+        exp_at = dateutil.parser.parse(access_key.get("ExpirationDate"))
+        now = datetime.now(tz=created_at.tzinfo)
+
         row = [
             user.get("UserName"),
             access_key.get("AccessKeyId", "N/A"),
-            access_key.get("State", "N/A"),
-            access_key.get("ExpirationDate", "N/A"),
-            user.get("CreationDate"),
+            state,
+            human_readable.date_time(now - created_at),
+            human_readable.date_time(now - exp_at)
         ]
         table.add_row(row)
 
@@ -123,7 +135,7 @@ def user_create(ctx, project_name, output, profile, user, ttl, nacl):
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def user_delete(ctx, project_name, user_name, output, dry_run, force, profile):
+def user_delete(ctx, project_name, user, output, dry_run, force, profile):
     """CLI command to delete an EIM user."""
     
     project_name, _, profile = ctx_update(ctx, project_name, None, profile)
@@ -132,11 +144,11 @@ def user_delete(ctx, project_name, user_name, output, dry_run, force, profile):
     project_id = find_project_id_by_name(project_name)
 
     if dry_run:
-        message = {"message": f"Dry run: The user '{user_name}' would be deleted."}
+        message = {"message": f"Dry run: The user '{user}' would be deleted."}
         print_output(message, output)
         return
 
-    if force or click.confirm(f"Are you sure you want to delete the user '{user_name}'?", abort=True):
-        data = do_request("DELETE", f"projects/{project_id}/eim_users/{user_name}")
+    if force or click.confirm(f"Are you sure you want to delete the user '{user}'?", abort=True):
+        data = do_request("DELETE", f"projects/{project_id}/eim_users/{user}")
         print_output(data, output)
     
