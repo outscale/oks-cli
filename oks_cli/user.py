@@ -27,11 +27,12 @@ def user(ctx, project_name, profile):
 # LIST USERS
 @user.command('list', help="List EIM users")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--profile', help="Configuration profile to use")
 @click.pass_context
-def user_list(ctx, output, profile):
+def user_list(ctx, output, project_name, profile):
     """List users"""
-    _, _, profile = ctx_update(ctx, None, None, profile)
+    project_name, _, profile = ctx_update(ctx, project_name, None, profile)
     login_profile(profile)
 
     project_id = get_project_id()
@@ -65,7 +66,7 @@ def user_list(ctx, output, profile):
 @click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use")
-@click.option('--user', required=True, help="OKS User type")
+@click.option('--user', '-u', required=True, help="OKS User type")
 @click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
 @click.option('--nacl', is_flag=True, help="Use public key encryption on wire")
 @click.pass_context
@@ -116,7 +117,7 @@ def user_create(ctx, project_name, output, profile, user, ttl, nacl):
 # DELETE USER
 @user.command('delete', help="Delete an EIM user")
 @click.option('--project-name', '-p', required=False, help="Project name", shell_complete=project_completer)
-@click.option('--user-name', '--name', '-u', required=True, help="User name")
+@click.option('--user', '-u', required=True, help="User name")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
 @click.option('--force', is_flag=True, help="Force deletion without confirmation")
