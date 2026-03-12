@@ -53,17 +53,27 @@ def user_list(ctx, output, project_name, profile):
         elif state == "INACTIVE":
             state = click.style(state, fg='red')
 
-        created_at = dateutil.parser.parse(user.get("CreationDate"))
-        exp_at = dateutil.parser.parse(access_key.get("ExpirationDate"))
-        now = datetime.now(tz=created_at.tzinfo)
 
         row = [
             user.get("UserName"),
             access_key.get("AccessKeyId", "N/A"),
-            state,
-            human_readable.date_time(now - created_at),
-            human_readable.date_time(now - exp_at)
+            state
         ]
+
+        if "CreationDate" in user:
+            created_at = dateutil.parser.parse(user.get("CreationDate"))
+            now = datetime.now(tz=created_at.tzinfo)
+            row.append(human_readable.date_time(now - created_at))
+        else:
+            row.append("N/A")
+
+        if "ExpirationDate" in access_key:
+            exp_at = dateutil.parser.parse(access_key.get("ExpirationDate"))
+            now = datetime.now(tz=exp_at.tzinfo)
+            row.append(human_readable.date_time(now - exp_at))
+        else:
+            row.append("N/A")
+
         table.add_row(row)
 
     click.echo(table)
