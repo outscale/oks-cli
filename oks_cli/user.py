@@ -60,8 +60,8 @@ def user_list(ctx, output, project_name, profile):
             state
         ]
 
-        if "CreationDate" in user:
-            created_at = dateutil.parser.parse(user.get("CreationDate"))
+        if "CreationDate" in access_key:
+            created_at = dateutil.parser.parse(access_key.get("CreationDate"))
             now = datetime.now(tz=created_at.tzinfo)
             row.append(human_readable.date_time(now - created_at))
         else:
