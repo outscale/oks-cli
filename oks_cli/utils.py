@@ -951,7 +951,7 @@ def install_completions(shell_type):
 
             shell_type = os.path.basename(shell_name).lstrip('-')
         except (subprocess.SubprocessError, FileNotFoundError):
-            click.echo("Failed to determine shell type, please specify it by --type")
+            raise click.ClickException("Failed to determine shell type, please specify it by --type")
 
     completion_dir = os.path.join(home, ".oks_cli", "completions")
     os.makedirs(completion_dir, exist_ok=True)
