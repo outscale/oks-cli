@@ -79,12 +79,12 @@ def user_list(ctx, output, project_name, profile):
     click.echo(table)
     
 
-@user.command('create', help="Create a new cluster")
+@user.command('create', help="Create a new EIM user")
 @click.option('--project-name', '-p', help="Name of project", type=click.STRING, shell_complete=project_completer)
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--profile', help="Configuration profile to use")
 @click.option('--user', '-u', required=True, help="OKS User type")
-@click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
+@click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w), by default is 1w")
 @click.option('--nacl', is_flag=True, help="Use public key encryption on wire")
 @click.pass_context
 def user_create(ctx, project_name, output, profile, user, ttl, nacl):
