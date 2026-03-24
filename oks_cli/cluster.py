@@ -736,19 +736,29 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=
 
         if not kubeconfig_raw:
             click.echo("Cannot get kubeconfig")
-            raise SystemExit()
+            raise SystemExit(1)
 
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
 
     env = dict(os.environ)
     env['KUBECONFIG'] = str(kubeconfig_path)
-    cmd = ['kubectl']
-    cmd += list(args)
+
+    cmd = ['kubectl'] + list(args)
     logging.info("running %s", cmd)
-    if not input:
-        return subprocess.run(cmd, env=env, capture_output=capture)
-    else:
-        return subprocess.run(cmd, input=input, text=True, env=env, capture_output=capture)
+
+    try:
+        if not input:
+            return subprocess.run(cmd, env=env, capture_output=capture, check=True)
+        else:
+            return subprocess.run(cmd, input=input, text=True, env=env, capture_output=capture, check=True)
+
+    except subprocess.CalledProcessError as e:
+        if e.stderr:
+            click.echo(e.stderr, err=True)
+        elif e.stdout:
+            click.echo(e.stdout, err=True)
+
+        raise SystemExit(e.returncode)
 
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
