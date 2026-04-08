@@ -79,6 +79,8 @@ def find_response_object(data):
             return response["IP"]
         elif key == "Nets":
             return response["Nets"]
+        elif key == "EimUserTypes":
+            return response["EimUserTypes"]
 
     raise click.ClickException("The API response format is incorrect.")
 
