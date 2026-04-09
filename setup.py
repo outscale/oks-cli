@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name="oks-cli",
-    version="1.20",
+    version="1.21",
     packages=['oks_cli'],
     author="Outscale SAS",
     author_email="opensource@outscale.com",
-    long_description=open("README.md").read(),
+    long_description=open("README.md", encoding="utf-8").read(), 
     long_description_content_type="text/markdown",
     include_package_data=True,
     license="BSD",

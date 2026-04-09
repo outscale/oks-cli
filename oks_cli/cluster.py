@@ -121,20 +121,20 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     if all:
         field_names.insert(0, "PROJECT")
 
-        projects = {project["id"]: project for project in do_request("GET", "projects")}
-        data = do_request("GET", "clusters/all", params=params)
-
-        for cluster in data:
-            project = projects.get(cluster.get("project_id"))
-            cluster["project_name"] = project.get("name")
-    else:
-        data = do_request("GET", "clusters", params=params)
-
     if output == "wide":
         field_names.insert(0, "ID")
         field_names.append("VERSION")
         field_names.append("CONTROL PLANE")
     elif output:
+        if all:
+            projects = {p["id"]: p for p in do_request("GET", "projects")}
+            data = do_request("GET", "clusters/all", params=params)
+            for cluster in data:
+                project = projects.get(cluster.get("project_id"))
+                cluster["project_name"] = project.get("name")
+        else:
+            data = do_request("GET", "clusters", params=params)
+
         print_output(data, output)
         return
 
@@ -149,10 +149,14 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     if msword:
         table.set_style(TableStyle.MSWORD_FRIENDLY)
 
-    initial_clusters = {}
 
-    for cluster in data:
-        row, _, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+    def build_row(cluster):
+        row, current_status, _ = format_row(
+            cluster.get('statuses'),
+            cluster.get('name'),
+            cluster_id == cluster.get('id')
+        )
+
         row.insert(1, profile_name)
         row.insert(2, region_name)
         if all:
@@ -163,6 +167,21 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
             row.append(cluster.get('version'))
             row.append(cluster.get('control_planes'))
 
+        return row, current_status
+
+    if all:
+        projects = {p["id"]: p for p in do_request("GET", "projects")}
+        data = do_request("GET", "clusters/all", params=params)
+        for cluster in data:
+            project = projects.get(cluster.get("project_id"))
+            cluster["project_name"] = project.get("name")
+    else:
+        data = do_request("GET", "clusters", params=params)
+
+    initial_clusters = {}
+
+    for cluster in data:
+        row, _ = build_row(cluster)
         table.add_row(row)
         initial_clusters[cluster.get("id")] = cluster
 
@@ -177,46 +196,32 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
                 try:
                     if all:
-                        projects = {project["id"]: project for project in do_request("GET", "projects")}
+                        projects = {p["id"]: p for p in do_request("GET", "projects")}
                         data = do_request("GET", "clusters/all", params=params)
-
                         for cluster in data:
                             project = projects.get(cluster.get("project_id"))
                             cluster["project_name"] = project.get("name")
                     else:
-                        data = do_request("GET", 'clusters', params=params)
+                        data = do_request("GET", "clusters", params=params)
                 except click.ClickException as err:
                     click.echo(f"Error during watch: {err}")
                     continue
 
-                current_cluster_ids = {cluster.get('id') for cluster in data}
+                current_ids = {c.get('id') for c in data}
 
-                for id, cluster in list(initial_clusters.items()):
-                    if id not in current_cluster_ids:
-                        deleted_cluster = cluster.copy()
+                for cl_id, stored_cluster in list(initial_clusters.items()):
+                    if cl_id not in current_ids:
+                        deleted_cluster = stored_cluster.copy()
                         deleted_cluster['statuses']['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_cluster.get('statuses'), deleted_cluster.get('name'), cluster_id == deleted_cluster.get('id'))
-                        row.insert(1, profile_name)
-                        row.insert(2, region_name)
-                        if all:
-                            project_name = click.style(cluster.get("project_name"), bold=True)
-                            row.insert(0, project_name)
-
+                        row, _ = build_row(deleted_cluster)
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
-                        
-                        del initial_clusters[id]
+                        del initial_clusters[cl_id]
 
                 for cluster in data:
-                    row, current_status, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
-                    row.insert(1, profile_name)
-                    row.insert(2, region_name)
-                    if all:
-                        project_name = click.style(cluster.get("project_name"), bold=True)
-                        row.insert(0, project_name)
-
                     cl_id = cluster.get('id')
+                    row, current_status = build_row(cluster)
 
                     if cl_id not in initial_clusters:
                         new_table = format_changed_row(table, row)
@@ -225,8 +230,8 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         continue
 
                     stored_cluster = initial_clusters[cl_id]
-                    cluster_status = stored_cluster.get('statuses').get('status')
-                    if cluster_status != current_status:
+                    stored_status = stored_cluster.get('statuses').get('status')
+                    if stored_status != current_status:
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
                         initial_clusters[cl_id] = cluster
@@ -523,7 +528,7 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
     if tags is not None:
         parsed_tags = {}
 
-        if not len(tags) == 0:
+        if len(tags) != 0:
             pairs = tags.split(',')
             for pair in pairs:
                 if '=' not in pair:
@@ -736,19 +741,29 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=
 
         if not kubeconfig_raw:
             click.echo("Cannot get kubeconfig")
-            raise SystemExit()
+            raise SystemExit(1)
 
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
 
     env = dict(os.environ)
     env['KUBECONFIG'] = str(kubeconfig_path)
-    cmd = ['kubectl']
-    cmd += list(args)
+
+    cmd = ['kubectl'] + list(args)
     logging.info("running %s", cmd)
-    if not input:
-        return subprocess.run(cmd, env=env, capture_output=capture)
-    else:
-        return subprocess.run(cmd, input=input, text=True, env=env, capture_output=capture)
+
+    try:
+        if not input:
+            return subprocess.run(cmd, env=env, capture_output=capture, check=True)
+        else:
+            return subprocess.run(cmd, input=input, text=True, env=env, capture_output=capture, check=True)
+
+    except subprocess.CalledProcessError as e:
+        if e.stderr:
+            click.echo(e.stderr, err=True)
+        elif e.stdout:
+            click.echo(e.stdout, err=True)
+
+        raise SystemExit(e.returncode)
 
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
