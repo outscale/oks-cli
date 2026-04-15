@@ -54,3 +54,35 @@ def test_user_delete_command(mock_request, add_default_profile):
     result = runner.invoke(cli, ["user", "delete", "-p", "test", "-u", "OKSAuditor", "--force"])
     assert result.exit_code == 0
     assert 'User has been deleted.' in result.output
+
+@patch("oks_cli.utils.requests.request")
+def test_user_types_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "EimUserTypes": [
+            {"UserType": "OKSSnapshotsManager", "Description": "OKS user with full access to snapshots"},
+            {"UserType": "OKSVolumesManager", "Description": "OKS user with management access to volumes BSU"},
+        ]})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["user", "types", "-p", "test"])
+    assert result.exit_code == 0
+    assert 'OKSSnapshotsManager' in result.output
+    assert 'OKSVolumesManager' in result.output
+
+@patch("oks_cli.utils.requests.request")
+def test_user_types_command_json(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "EimUserTypes": [
+            {"UserType": "OKSSnapshotsManager", "Description": "OKS user with full access to snapshots"},
+            {"UserType": "OKSVolumesManager", "Description": "OKS user with management access to volumes BSU"},
+        ]})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["user", "types", "-p", "test", "-o", "json"])
+    assert result.exit_code == 0
+    assert 'OKSSnapshotsManager' in result.output
+    assert 'OKS user with full access to snapshots' in result.output
