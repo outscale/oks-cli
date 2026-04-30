@@ -7,6 +7,7 @@ import json
 
 from nacl.public import PrivateKey, SealedBox
 from nacl.encoding import Base64Encoder
+from prettytable import TableStyle
 
 from .utils import do_request, print_output, find_project_id_by_name, ctx_update, login_profile, profile_completer, project_completer, JSONClickException
 
@@ -166,4 +167,38 @@ def user_delete(ctx, project_name, user, output, dry_run, force, profile):
     if force or click.confirm(f"Are you sure you want to delete the user '{user}'?", abort=True):
         data = do_request("DELETE", f"projects/{project_id}/eim_users/{user}")
         print_output(data, output)
+
+
+@user.command('types', help="List available user types")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format")
+@click.option('--plain', is_flag=True, help="Plain table format")
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.pass_context
+def user_types(ctx, project_name, output, plain, profile):
+    """Display available user types."""
+    project_name, _, profile = ctx_update(ctx, project_name, None, profile)
+    login_profile(profile)
+
+    project_id = find_project_id_by_name(project_name)
+
+    data = do_request("GET", f'projects/{project_id}/eim_users/types')
+
+    if output:
+        print_output(data, output)
+        return
+
+    table = prettytable.PrettyTable()
+    table.field_names = ["USER TYPE", "DESCRIPTION"]
+
+    if plain:
+        table.set_style(TableStyle.PLAIN_COLUMNS)
+
+    for entry in data:
+        table.add_row([
+            entry.get("UserType", ""),
+            entry.get("Description") or "-"
+        ])
+
+    click.echo(table)
     
