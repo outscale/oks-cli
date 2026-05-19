@@ -83,6 +83,8 @@ def find_response_object(data):
             return response["EimUsers"]
         elif key == "EimUser":
             return response["EimUser"]
+        elif key == "AdmissionPlugins":
+            return response["AdmissionPlugins"]
         elif key == "Data":
             return response
 
@@ -847,9 +849,11 @@ def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
 
     return kubedata
 
-def retrieve_cp_sized(filepath, endpoint):
+def retrieve_cp_sized(filepath, endpoint, key = None):
     """Fetch control plane sizes from API and save to file."""
     cp_list = do_request("GET", endpoint)
+    if key:
+        cp_list = cp_list.get(key)
 
     with open(filepath, "w") as file:
         json.dump(cp_list, file)
@@ -871,6 +875,8 @@ def shell_completions(ctx, param: click.core.Option, incomplete):
     if profile not in profiles:
         return []
 
+    key = None
+
     login_profile(profile)
 
     if param.name == "version":
@@ -879,6 +885,16 @@ def shell_completions(ctx, param: click.core.Option, incomplete):
         endpoint = "clusters/limits/control_plane_plans"
     elif param.name == "zone":
         endpoint = "clusters/limits/cp_subregions"
+    elif param.name == "disable_admission_plugins" and ctx.params["version"]:
+        key = "DisableAdmissionPlugins"
+        version = ctx.params["version"]
+        endpoint = f"clusters/limits/admission_plugins?version={version}"
+        param.name += f".{version}"
+    elif param.name == "enable_admission_plugins" and ctx.params["version"]:
+        key = "EnableAdmissionPlugins"
+        version = ctx.params["version"]
+        endpoint = f"clusters/limits/admission_plugins?version={version}"
+        param.name += f".{version}"
     else:
         return []
     
@@ -888,15 +904,28 @@ def shell_completions(ctx, param: click.core.Option, incomplete):
     if os.path.exists(CP_SIZES_PATH):
         file_ctime = os.path.getctime(CP_SIZES_PATH)
         if datetime.timestamp(datetime.now()) - file_ctime > 300:
-            retrieve_cp_sized(CP_SIZES_PATH, endpoint)
+            retrieve_cp_sized(CP_SIZES_PATH, endpoint, key)
     else:
-        retrieve_cp_sized(CP_SIZES_PATH, endpoint)
+        retrieve_cp_sized(CP_SIZES_PATH, endpoint, key)
 
     if os.path.exists(CP_SIZES_PATH):
         with open(CP_SIZES_PATH, "r") as file:
             cp_list = json.load(file)
     else:
         cp_list = []
+
+    # Handle comma-separated values
+    if "," in incomplete:
+        parts = incomplete.split(",")
+        selected = set(parts[:-1])
+        current = parts[-1]
+        prefix = ",".join(parts[:-1])
+
+        return [
+            f"{prefix},{item}"
+            for item in cp_list
+            if item.startswith(current) and item not in selected
+        ]
 
     return [k for k in cp_list if k.startswith(incomplete)]
 
