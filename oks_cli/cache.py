@@ -38,7 +38,7 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
 
     result = get_all_cache(project_id, cluster_id, "kubeconfig")
 
-    data = list()
+    data = []
     fields = [["user", "user"],["group", "group"], ["expiration date", "expires_at"]]
 
     for element in result:

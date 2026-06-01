@@ -23,7 +23,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, format_row
+                   kubeconfig_parse_fields, print_table, format_row, apply_set_fields
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -74,6 +74,13 @@ def cluster_logout(ctx, profile):
     """Clear the current default cluster selection."""
     _, _, profile = ctx_update(ctx, None, None, profile)
     login_profile(profile)
+    
+    current_cluster = get_cluster_id() 
+
+    if not current_cluster:
+        click.echo("You are not connected to any cluster.")
+        return
+    
     set_cluster_id("")
     click.echo("Logged out from the current cluster")
 
@@ -81,7 +88,7 @@ def cluster_logout(ctx, profile):
 @cluster.command('list', help="List all clusters")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
-@click.option('--deleted', '-x', is_flag=True, help="List deleted clusters")  # x pour "deleted" / "removed"
+@click.option('--deleted', '-x', is_flag=True, deprecated="List deleted clusters - Will be removed")  # x pour "deleted" / "removed"
 @click.option('--plain', is_flag=True, help="Plain table format")
 @click.option('--msword', is_flag=True, help="Microsoft Word table format")
 @click.option('--watch', '-w', is_flag=True, help="Watch the changes")
@@ -114,20 +121,20 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
     if all:
         field_names.insert(0, "PROJECT")
 
-        projects = {project["id"]: project for project in do_request("GET", "projects")}
-        data = do_request("GET", "clusters/all", params=params)
-
-        for cluster in data:
-            project = projects.get(cluster.get("project_id"))
-            cluster["project_name"] = project.get("name")
-    else:
-        data = do_request("GET", "clusters", params=params)
-
     if output == "wide":
         field_names.insert(0, "ID")
         field_names.append("VERSION")
         field_names.append("CONTROL PLANE")
     elif output:
+        if all:
+            projects = {p["id"]: p for p in do_request("GET", "projects")}
+            data = do_request("GET", "clusters/all", params=params)
+            for cluster in data:
+                project = projects.get(cluster.get("project_id"))
+                cluster["project_name"] = project.get("name")
+        else:
+            data = do_request("GET", "clusters", params=params)
+
         print_output(data, output)
         return
 
@@ -140,12 +147,16 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
         table.set_style(TableStyle.PLAIN_COLUMNS)
 
     if msword:
-        table.set_style(prettytable.MSWORD_FRIENDLY)
+        table.set_style(TableStyle.MSWORD_FRIENDLY)
 
-    initial_clusters = {}
 
-    for cluster in data:
-        row, _, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
+    def build_row(cluster):
+        row, current_status, _ = format_row(
+            cluster.get('statuses'),
+            cluster.get('name'),
+            cluster_id == cluster.get('id')
+        )
+
         row.insert(1, profile_name)
         row.insert(2, region_name)
         if all:
@@ -156,6 +167,21 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
             row.append(cluster.get('version'))
             row.append(cluster.get('control_planes'))
 
+        return row, current_status
+
+    if all:
+        projects = {p["id"]: p for p in do_request("GET", "projects")}
+        data = do_request("GET", "clusters/all", params=params)
+        for cluster in data:
+            project = projects.get(cluster.get("project_id"))
+            cluster["project_name"] = project.get("name")
+    else:
+        data = do_request("GET", "clusters", params=params)
+
+    initial_clusters = {}
+
+    for cluster in data:
+        row, _ = build_row(cluster)
         table.add_row(row)
         initial_clusters[cluster.get("id")] = cluster
 
@@ -170,46 +196,32 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
 
                 try:
                     if all:
-                        projects = {project["id"]: project for project in do_request("GET", "projects")}
+                        projects = {p["id"]: p for p in do_request("GET", "projects")}
                         data = do_request("GET", "clusters/all", params=params)
-
                         for cluster in data:
                             project = projects.get(cluster.get("project_id"))
                             cluster["project_name"] = project.get("name")
                     else:
-                        data = do_request("GET", 'clusters', params=params)
+                        data = do_request("GET", "clusters", params=params)
                 except click.ClickException as err:
                     click.echo(f"Error during watch: {err}")
                     continue
 
-                current_cluster_ids = {cluster.get('id') for cluster in data}
+                current_ids = {c.get('id') for c in data}
 
-                for id, cluster in list(initial_clusters.items()):
-                    if id not in current_cluster_ids:
-                        deleted_cluster = cluster.copy()
+                for cl_id, stored_cluster in list(initial_clusters.items()):
+                    if cl_id not in current_ids:
+                        deleted_cluster = stored_cluster.copy()
                         deleted_cluster['statuses']['status'] = 'deleted'
 
-                        row, current_status, _ = format_row(deleted_cluster.get('statuses'), deleted_cluster.get('name'), cluster_id == deleted_cluster.get('id'))
-                        row.insert(1, profile_name)
-                        row.insert(2, region_name)
-                        if all:
-                            project_name = click.style(cluster.get("project_name"), bold=True)
-                            row.insert(0, project_name)
-
+                        row, _ = build_row(deleted_cluster)
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
-                        
-                        del initial_clusters[id]
+                        del initial_clusters[cl_id]
 
                 for cluster in data:
-                    row, current_status, name = format_row(cluster.get('statuses'), cluster.get('name'), cluster_id == cluster.get('id'))
-                    row.insert(1, profile_name)
-                    row.insert(2, region_name)
-                    if all:
-                        project_name = click.style(cluster.get("project_name"), bold=True)
-                        row.insert(0, project_name)
-
                     cl_id = cluster.get('id')
+                    row, current_status = build_row(cluster)
 
                     if cl_id not in initial_clusters:
                         new_table = format_changed_row(table, row)
@@ -218,8 +230,8 @@ def cluster_list(ctx, project_name, cluster_name, deleted, plain, msword, watch,
                         continue
 
                     stored_cluster = initial_clusters[cl_id]
-                    cluster_status = stored_cluster.get('statuses').get('status')
-                    if cluster_status != current_status:
+                    stored_status = stored_cluster.get('statuses').get('status')
+                    if stored_status != current_status:
                         new_table = format_changed_row(table, row)
                         click.echo(new_table)
                         initial_clusters[cl_id] = cluster
@@ -371,8 +383,9 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
-def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, cp_multi_az, dry_run, output, filename, profile):
+def cluster_create_command(ctx, project_name, cluster_name, description, admin, version, cidr_pods, cidr_service, control_plane, zone, enable_admission_plugins, disable_admission_plugins, quirk, tags, disable_api_termination, cp_multi_az, dry_run, output, filename, profile, set_fields):
     """CLI command to create a new Kubernetes cluster with optional configuration parameters."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -440,8 +453,10 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
     if disable_api_termination is not None:
         cluster_config["disable_api_termination"] = disable_api_termination
     
-    if cp_multi_az is not None:
+    if cp_multi_az:
         cluster_config["cp_multi_az"] = cp_multi_az
+
+    apply_set_fields(cluster_config, set_fields)
 
     if not dry_run:
         _create_cluster(project_name, cluster_config, output)
@@ -468,8 +483,9 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to update the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
-def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, zone, cp_multi_az, dry_run, output, filename, profile):
+def cluster_update_command(ctx, project_name, cluster_name, description, admin, version, tags, enable_admission_plugins, disable_admission_plugins, quirk, disable_api_termination, control_plane, zone, cp_multi_az, dry_run, output, filename, profile, set_fields):
     """CLI command to update an existing Kubernetes cluster with new configuration options."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
@@ -506,7 +522,7 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
                         raise click.ClickException(f"Unable to resolve 'my-ip': {e}")
                 else:
                     resolved_ips.append(ip)
-            cluster_config['admin_whitelist'] = resolved_ips
+            cluster_config['admin_whitelist'] = list(dict.fromkeys(resolved_ips))
 
     if version is not None:
         cluster_config['version'] = version
@@ -514,7 +530,7 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
     if tags is not None:
         parsed_tags = {}
 
-        if not len(tags) == 0:
+        if len(tags) != 0:
             pairs = tags.split(',')
             for pair in pairs:
                 if '=' not in pair:
@@ -556,6 +572,8 @@ def cluster_update_command(ctx, project_name, cluster_name, description, admin, 
 
     if cp_multi_az:
         cluster_config['cp_multi_az'] = True
+
+    apply_set_fields(cluster_config, set_fields)
 
     if dry_run:
         print_output(cluster_config, output)
@@ -711,7 +729,7 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
             click.echo(kubeconfig)
 
 
-def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
+def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=False):
     """Run a kubectl command using the cached kubeconfig for the specified cluster, refreshing it if needed."""
     # @TODO: check expiration in get_cache() code, etc
     kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig', user, group)
@@ -734,19 +752,29 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None):
 
         if not kubeconfig_raw:
             click.echo("Cannot get kubeconfig")
-            raise SystemExit()
+            raise SystemExit(1)
 
         kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
 
     env = dict(os.environ)
     env['KUBECONFIG'] = str(kubeconfig_path)
-    cmd = ['kubectl']
-    cmd += list(args)
+
+    cmd = ['kubectl'] + list(args)
     logging.info("running %s", cmd)
-    if not input:
-        return subprocess.run(cmd, env = env)
-    else:
-        return subprocess.run(cmd, input=input, text=True, env = env)
+
+    try:
+        if not input:
+            return subprocess.run(cmd, env=env, capture_output=capture, check=True)
+        else:
+            return subprocess.run(cmd, input=input, text=True, env=env, capture_output=capture, check=True)
+
+    except subprocess.CalledProcessError as e:
+        if e.stderr:
+            click.echo(e.stderr, err=True)
+        elif e.stdout:
+            click.echo(e.stdout, err=True)
+
+        raise SystemExit(e.returncode)
 
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
@@ -833,8 +861,21 @@ def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, 
 
 @nodepool.command('delete')
 @click.option('--nodepool-name', '-n', required=True, help="Nodepool Name")
+@click.option('--force', is_flag=True, help="Delete without confirmation")
 @click.pass_context
-def delete_worker_pool(ctx, nodepool_name):
+def delete_worker_pool(ctx, nodepool_name, force):
     """Delete a nodepool by name from the cluster."""
-    _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'], [
-                 'delete', 'nodepool', nodepool_name])
+
+    if not force:
+        click.confirm(
+            f"Are you sure you want to delete the nodepool '{nodepool_name}'?",
+            abort=True
+        )
+
+    _run_kubectl(
+        ctx.obj['project_id'],
+        ctx.obj['cluster_id'],
+        ctx.obj['user'],
+        ctx.obj['group'],
+        ['delete', 'nodepool', nodepool_name]
+    )

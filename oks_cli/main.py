@@ -8,6 +8,8 @@ from .cluster import cluster
 from .profile import profile
 from .cache import cache
 from .quotas import quotas
+from .netpeering import netpeering
+from .user import user
 
 from .utils import ctx_update, install_completions, profile_completer, cluster_completer, project_completer
 
@@ -46,7 +48,7 @@ def cli(ctx, project_name, cluster_name, profile, verbose):
         click.echo(ctx.get_help())
 
     if not hasattr(ctx, 'obj') or not ctx.obj:
-        ctx.obj = dict()
+        ctx.obj = {}
 
     if project_name != None:
         ctx.obj['project_name'] = project_name
@@ -60,6 +62,8 @@ cli.add_command(cluster)
 cli.add_command(profile)
 cli.add_command(cache)
 cli.add_command(quotas)
+cli.add_command(netpeering)
+cli.add_command(user)
 
 def recursive_help(cmd, parent=None):
     """Recursively prints help for all commands and subcommands."""

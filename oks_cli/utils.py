@@ -79,6 +79,12 @@ def find_response_object(data):
             return response["IP"]
         elif key == "Nets":
             return response["Nets"]
+        elif key == "EimUsers":
+            return response["EimUsers"]
+        elif key == "EimUser":
+            return response["EimUser"]
+        elif key == "Data":
+            return response
 
     raise click.ClickException("The API response format is incorrect.")
 
@@ -202,8 +208,8 @@ def print_table(data, table_fields, align="l", style=None):
     table.align = align
     if style and isinstance(style, prettytable.TableStyle):
         table.set_style(style)
-    fields = list()
-    values = list()
+    fields = []
+    values = []
 
     for d in table_fields:
         fields.append(d[0])
@@ -246,6 +252,23 @@ def handle_jwt_error(err, method, path, args, kwargs):
             return do_request(method, path, *args, **kwargs)
     except Exception:
         return None
+
+
+# TODO: Introduce `find_project_by_name` into `find_project_by_id` method for merging
+def find_project_by_name(project_name):
+    """Retrieve the project data by name or use the default project if no name is provided."""
+    if not project_name:
+        project_id = get_project_id()
+        if not project_id:
+            raise click.BadParameter("--project-name must be specified, or a default project must be set")
+    else:
+        data = do_request("GET", 'projects', params={"name": project_name})
+        if len(data) != 1:
+            errors = {"Error": f"{len(data)} projects found by name: {project_name}"}
+            raise JSONClickException(json.dumps(errors))
+        project = data.pop()
+
+    return project
 
 def find_project_id_by_name(project_name):
     """Retrieve the project ID by name or use the default project if no name is provided."""
@@ -400,7 +423,7 @@ def format_row(data: dict, name: str, is_default: bool):
     """Parse status and dates from a cluster of project object and returns elements"""
 
     if not data.get('status'):
-        raise click.ClickException(f"Can't find 'status' in project/cluster data")
+        raise click.ClickException("Can't find 'status' in project/cluster data")
 
     status = data.get('status')
     if status == 'ready':
@@ -742,28 +765,33 @@ def verify_certificate(kubeconfig_str):
     """Check if the kubeconfig client certificate is still valid."""
     not_after_date = get_expiration_date(kubeconfig_str)
 
-    if not_after_date < datetime.now():
-        return False
-    else:
-        return True
+    if not_after_date:
+        if not_after_date < datetime.now():
+            return False
+        else:
+            return True
+    return False
 
 def get_expiration_date(kubeconfig_str):
     """Extract and return the client certificate expiration date."""
     kubeconfig = yaml.safe_load(kubeconfig_str)
 
-    for user_entry in kubeconfig.get('users', []):
-        user_details = user_entry['user']
-        client_cert_data = user_details.get('client-certificate-data')
+    try:
+        for user_entry in kubeconfig.get('users', []):
+            user_details = user_entry['user']
+            client_cert_data = user_details.get('client-certificate-data')
 
-        if not client_cert_data:
-            logging.info("No client certificate data found for user.")
-            continue
+            if not client_cert_data:
+                logging.info("No client certificate data found for user.")
+                continue
 
-        cert = decode_parse_certificate(client_cert_data)
-        not_after = cert.get_notAfter().decode('ascii')
-        not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
+            cert = decode_parse_certificate(client_cert_data)
+            not_after = cert.get_notAfter().decode('ascii')
+            not_after_date = datetime.strptime(not_after, '%Y%m%d%H%M%SZ')
 
-        return not_after_date
+            return not_after_date
+    except AttributeError as e:
+        logging.warning(f"Error occured reading kubeconfig: {e}")
 
 def decode_parse_certificate(cert_str):
     """Parse base64 encoded certificate data and returns cert (X509) object"""
@@ -783,14 +811,14 @@ def kubeconfig_parse_fields(kubeconfig, cluster_name, user, group):
     group: user group name of this kubeconfig (if set)
     """
     kubeconfig_str = yaml.safe_load(kubeconfig)
-    kubedata = list()
+    kubedata = []
 
     # Ensure loaded YAML returnes a valid dict object
     if not isinstance(kubeconfig_str, dict):
         return kubedata
 
     for context in kubeconfig_str.get('contexts', []):
-        data = dict()
+        data = {}
         ctx_cluster = context.get('context').get('cluster', None)
         ctx_user = context.get('context').get('user', None)
         ctx_name = context.get('name')
@@ -895,7 +923,11 @@ def find_shell_profile(home, shell_type):
         if os.path.exists(bash_profile) and os.path.exists(bashrc):
             return None
 
-        shell_profile = bash_profile or bashrc
+        if os.path.exists(bash_profile):
+            shell_profile = bash_profile
+
+        if os.path.exists(bashrc):
+            shell_profile = bashrc
 
     elif shell_type == "zsh":
 
@@ -905,7 +937,11 @@ def find_shell_profile(home, shell_type):
         if os.path.exists(zshrc) and os.path.exists(profile):
             return None
 
-        shell_profile = zshrc or profile
+        if os.path.exists(zshrc):
+            shell_profile = zshrc
+
+        if os.path.exists(profile):
+            shell_profile = profile
 
     return shell_profile
 
@@ -920,8 +956,8 @@ def install_completions(shell_type):
             shell_name = result.stdout.strip()
 
             shell_type = os.path.basename(shell_name).lstrip('-')
-        except subprocess.SubProcessError:
-            click.echo("Failed to determine shell type, please specify it by --type")
+        except (subprocess.SubprocessError, FileNotFoundError):
+            raise click.ClickException("Failed to determine shell type, please specify it by --type")
 
     completion_dir = os.path.join(home, ".oks_cli", "completions")
     os.makedirs(completion_dir, exist_ok=True)
@@ -1007,7 +1043,7 @@ def get_template(type):
 def ctx_update(ctx, project_name=None, cluster_name=None, profile=None, overwrite=True):
     """Update context with project, cluster, and profile; optionally prevent overwrites."""
     if not hasattr(ctx, 'obj') or not ctx.obj:
-        ctx.obj = dict()
+        ctx.obj = {}
 
     if project_name is not None:
         if ctx.obj.get('project_name') and not overwrite:
@@ -1071,3 +1107,68 @@ def is_interesting_status(status):
     """Check if status is in the list of interesting statuses."""
     interesting_statuses = ["pending", "deploying", "updating", "upgrading", "deleting"]
     return status in interesting_statuses
+
+def normalize_key_path(key_path: str) -> str:
+    return re.sub(r'\[(\d+)\]', r'.\1', key_path)
+
+def parse_value(value: str):
+    value = value.strip()
+
+    try:
+        return json.loads(value)
+    except Exception:
+        pass
+
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+
+
+    if ',' in value:
+        return [parse_value(v) for v in value.split(',')]
+
+    return value
+
+def apply_set_fields(target: dict, set_fields):
+    for field in set_fields:
+        if '=' not in field:
+            raise click.ClickException(
+                f"Malformed --set argument: '{field}' (expected key=value)"
+            )
+
+        raw_key, value_str = field.split('=', 1)
+        key_path = normalize_key_path(raw_key)
+        key_parts = key_path.split('.')
+        value = parse_value(value_str)
+
+        current = target
+        for i, part in enumerate(key_parts[:-1]):
+            next_part = key_parts[i + 1]
+
+            is_index = part.isdigit()
+            next_is_index = next_part.isdigit()
+
+            if is_index:
+                idx = int(part)
+                if not isinstance(current, list):
+                    current_parent = []
+                    current[:] = current_parent  # if needed
+                while len(current) <= idx:
+                    current.append({})
+                current = current[idx]
+            else:
+                if part not in current:
+                    current[part] = [] if next_is_index else {}
+                current = current[part]
+
+        last = key_parts[-1]
+        if last.isdigit():
+            idx = int(last)
+            if not isinstance(current, list):
+                current[last] = []
+            while len(current) <= idx:
+                current.append(None)
+            current[idx] = value
+        else:
+            current[last] = value

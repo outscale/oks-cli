@@ -81,7 +81,7 @@ def test_nodepool_delete_command(mock_request, mock_run, add_default_profile):
     ]
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["cluster", "nodepool", "-p", "test", "-c", "test", "delete", '-n', 'test'])
+    result = runner.invoke(cli, ["cluster", "nodepool", "-p", "test", "-c", "test", "delete", '-n', 'test', '--force'])
     mock_run.assert_called()
     
     args, kwargs = mock_run.call_args
