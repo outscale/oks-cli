@@ -10,6 +10,6 @@ jobs:
     steps:
     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
     - name: Github sanity scanner
-      uses: outscale/github-sanity-scan@main
+      uses: outscale/github-sanity-scan@380a9927b4be45d9c4f6f66a4e8dfd7cf7b18513 # main
       with:
         no-pull-request-target: true
