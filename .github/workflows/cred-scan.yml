@@ -8,7 +8,7 @@ jobs:
   cred-scan:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
     - name: Scan credentials
       uses: outscale/cred-scan@36ef82cc690d72a17bf0993ab323961f1b1f9c66 # main
       with:
