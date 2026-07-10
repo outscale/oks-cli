@@ -43,7 +43,7 @@ Destructive tools (`project_delete`, `cluster_delete`, `cluster_upgrade`, `nodep
   oks-cli profile add --access-key <AK> --secret-key <SK> --region eu-west-2
   ```
 
-## Setting it up in Claude
+## Client setup
 
 The server can be launched two equivalent ways:
 
@@ -52,7 +52,7 @@ oks-cli-mcp                    # console script installed by setup.py
 python -m oks_cli.mcp_server   # module form, no PATH dependency
 ```
 
-Point your Claude client at one of these. Pick the scope that matches how you want to share the config:
+Point your MCP client at one of these. Pick the scope that matches how you want to share the config:
 
 ### Project scope (this repo)
 
@@ -89,6 +89,22 @@ Add the same block to Claude Desktop's `claude_desktop_config.json` (Settings â†
     "oks-cli": {
       "command": "python",
       "args": ["-m", "oks_cli.mcp_server"]
+    }
+  }
+}
+```
+
+### OpenCode
+
+Add the same block to OpenCode's config â€” either project-scoped (`opencode.json` at the repo root) or global (`~/.config/opencode/opencode.json`):
+
+```json
+{
+  "mcp": {
+    "oks-cli": {
+      "type": "local",
+      "command": ["python", "-m", "oks_cli.mcp_server"],
+      "enabled": true
     }
   }
 }
