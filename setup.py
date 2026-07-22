@@ -22,7 +22,10 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
     ],
-    entry_points={"console_scripts": ["oks-cli = oks_cli.main:cli"]},
+    entry_points={"console_scripts": [
+        "oks-cli = oks_cli.main:cli",
+        "oks-cli-mcp = oks_cli.mcp_server:main",
+    ]},
     install_requires=[
         "certifi>=2024.8.30",
         "charset-normalizer>=3.3.2",
@@ -42,6 +45,9 @@ setup(
     extras_require={
         'dev': [
             'pytest>=8.4.1',
+        ],
+        'mcp': [
+            'mcp>=1.28.1',
         ],
     }
 )
