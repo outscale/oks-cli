@@ -101,6 +101,7 @@ oks-cli fullhelp
 | cluster list                         | List all clusters                                             |
 | cluster create                       | Create a new cluster                                          |
 | cluster get                          | Get a cluster by name                                         |
+| cluster health                       | Get the health status of a cluster                            |
 | cluster update                       | Update a cluster by name                                      |
 | cluster upgrade                      | Upgrade a cluster by name                                     |
 | cluster delete                       | Delete a cluster by name                                      |
