@@ -162,6 +162,43 @@ def test_cluster_get_yaml(mock_request, add_default_profile):
     assert data["name"] == "test"
 
 
+# Test the "cluster health" command: verifies fetching the health status of a specific cluster
+@patch("oks_cli.utils.requests.request")
+def test_cluster_health_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Health": {"status": "HEALTHY", "status_message": "ok"}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "health", "-p", "test", "-c", "test"])
+    assert result.exit_code == 0
+    assert '"status": "HEALTHY"' in result.output
+
+# Test the "cluster health" command with YAML output
+@patch("oks_cli.utils.requests.request")
+def test_cluster_health_command_yaml(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Health": {"status": "WARNING", "status_message": "health data not yet available"}}),
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "cluster", "health",
+        "-p", "test",
+        "-c", "test",
+        "-o", "yaml",
+        "--profile", "default"
+    ])
+
+    assert result.exit_code == 0
+
+    output = yaml.safe_load(result.output)
+    assert output["status"] == "WARNING"
+
 # Test the "cluster create" command: verifies creating a new cluster in a project
 @patch("oks_cli.utils.requests.request")
 def test_cluster_create_command(mock_request, add_default_profile):

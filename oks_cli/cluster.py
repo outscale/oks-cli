@@ -265,6 +265,25 @@ def cluster_get_command(ctx, project_name, cluster_name, output, profile):
 
     print_output(data, output)
 
+# GET CLUSTER HEALTH BY NAME
+@cluster.command('health', help="Get the health status of a cluster")
+@click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
+@click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.pass_context
+def cluster_health_command(ctx, project_name, cluster_name, output, profile):
+    """Retrieve and display the health status of a specific cluster."""
+    project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
+    login_profile(profile)
+
+    project_id = find_project_id_by_name(project_name)
+    cluster_id = find_cluster_id_by_name(project_id, cluster_name)
+
+    data = do_request("GET", f'clusters/{cluster_id}/health')
+
+    print_output(data, output)
+
 
 def prepare_cluster_template(cluster_config):
     cluster_template = get_template("cluster")
