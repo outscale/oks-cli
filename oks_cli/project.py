@@ -193,7 +193,7 @@ def project_list(ctx, project_name, deleted, plain, msword, uuid, watch, output,
 @click.option('--disable-api-termination', type=click.BOOL, help="Disable delete action by API")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml", "silent"]), help="Specify output format, by default is json")
-@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the project")
+@click.option('--filename', '-f', type=click.File("rb"), help="Path to file to use to create the project")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
