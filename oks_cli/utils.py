@@ -150,72 +150,60 @@ def sign(key, msg):
     """Generate HMAC-SHA256 signature of a message using a secret key."""
     return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
 
-def get_signature_key(key, date_stamp, region_name, service_name, scheme="OSC4"):
-    """Derive signature key (OSC4 or AWS4) using the secret access key and request details."""
-    k_date = sign((scheme + key).encode('utf-8'), date_stamp)
+def get_signature_key(key, date_stamp, region_name, service_name):
+    """Derive AWS4 signature key using the secret access key and request details."""
+    k_date = sign(('AWS4' + key).encode('utf-8'), date_stamp)
     k_region = sign(k_date, region_name)
     k_service = sign(k_region, service_name)
-    k_signing = sign(k_service, f"{scheme.lower()}_request")
+    k_signing = sign(k_service, 'aws4_request')
     return k_signing
 
 def hash_sha256(message):
     """Return the SHA-256 hash (hex) of the input message."""
     return hashlib.sha256(message.encode('utf-8')).hexdigest()
 
-def create_string_to_sign(amz_date, credential_scope, canonical_request_hash, scheme="OSC4"):
-    """Build the 'String to Sign' from request metadata and canonical request hash."""
-    return f"{scheme}-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{canonical_request_hash}"
+def create_string_to_sign(amz_date, credential_scope, canonical_request_hash):
+    """Build the AWS4 'String to Sign' from request metadata and canonical request hash."""
+    return f"AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{canonical_request_hash}"
 
-def generate_signature(ak, sk, region, service, amz_date, uri_path):
+def generate_aws4_signature(sk, region, service, amz_date, method, canonical_uri, headers):
     """
-    Generate AWS Signature Version 4 for a request using credentials and metadata.
-    
-    Returns a dictionary with AccessKey, Signature, and StringToSign.
+    Generate AWS Signature Version 4 for a request with an empty body.
+
+    All entries of `headers` (lowercase name -> value) are signed.
+    Returns the hex signature.
     """
-    method = "POST"
-    canonical_uri = uri_path
-    canonical_querystring = ""
-    canonical_headers = f"content-type:application/json\nhost:{service}.{region}.outscale.com\nx-osc-date:{amz_date}\n"
-    signed_headers = "content-type;host;x-osc-date"
-    payload_hash = hash_sha256('')  # Empty body
-
-    canonical_request = f"{method}\n{canonical_uri}\n{canonical_querystring}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
-    canonical_request_hash = hash_sha256(canonical_request)
-
-    date_stamp = amz_date[:8]
-    credential_scope = f"{date_stamp}/{region}/{service}/osc4_request"
-    string_to_sign = create_string_to_sign(amz_date, credential_scope, canonical_request_hash)
-
-    signing_key = get_signature_key(sk, date_stamp, region, service)
-    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
-
-    return signature
-
-def generate_oos_head_bucket_signature(ak, sk, region, amz_date, bucket):
-    """
-    Generate AWS Signature Version 4 for an OOS (S3) HeadBucket request (path-style).
-
-    Returns a dictionary with AccessKey, Signature, StringToSign and PayloadHash.
-    """
-    service = "s3"
-    method = "HEAD"
-    canonical_uri = f"/{bucket}"
     canonical_querystring = ""
     payload_hash = hash_sha256('')  # Empty body
-    canonical_headers = f"host:oos.{region}.outscale.com\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n"
-    signed_headers = "host;x-amz-content-sha256;x-amz-date"
+    signed_header_names = sorted(headers)
+    canonical_headers = "".join(f"{name}:{headers[name]}\n" for name in signed_header_names)
+    signed_headers = ";".join(signed_header_names)
 
     canonical_request = f"{method}\n{canonical_uri}\n{canonical_querystring}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
     canonical_request_hash = hash_sha256(canonical_request)
 
     date_stamp = amz_date[:8]
     credential_scope = f"{date_stamp}/{region}/{service}/aws4_request"
-    string_to_sign = create_string_to_sign(amz_date, credential_scope, canonical_request_hash, scheme="AWS4")
+    string_to_sign = create_string_to_sign(amz_date, credential_scope, canonical_request_hash)
 
-    signing_key = get_signature_key(sk, date_stamp, region, service, scheme="AWS4")
-    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+    signing_key = get_signature_key(sk, date_stamp, region, service)
+    return hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
 
-    return signature
+def generate_read_accounts_signature(sk, region, amz_date):
+    """Generate AWS4 signature for an OUTSCALE API ReadAccounts request."""
+    return generate_aws4_signature(sk, region, "api", amz_date, "POST", "/api/v1/ReadAccounts", {
+        "content-type": "application/json",
+        "host": f"api.{region}.outscale.com",
+        "x-amz-date": amz_date,
+    })
+
+def generate_oos_head_bucket_signature(sk, region, amz_date, bucket):
+    """Generate AWS4 signature for an OOS (S3) HeadBucket request (path-style)."""
+    return generate_aws4_signature(sk, region, "s3", amz_date, "HEAD", f"/{bucket}", {
+        "host": f"oos.{region}.outscale.com",
+        "x-amz-content-sha256": hash_sha256(''),
+        "x-amz-date": amz_date,
+    })
 
 def build_signed_requests_token(ak, sk, region):
     """
@@ -223,13 +211,12 @@ def build_signed_requests_token(ak, sk, region):
 
     Returns both signatures packed into a base64-encoded JSON token.
     """
-    read_accounts_path = "/api/v1/ReadAccounts"
     head_bucket_name = "s3-bucket-oks-eim-user-check"
 
     amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 
-    read_accounts_signature = generate_signature(ak, sk, region, "api", amz_date, read_accounts_path)
-    head_bucket_signature = generate_oos_head_bucket_signature(ak, sk, region, amz_date, head_bucket_name)
+    read_accounts_signature = generate_read_accounts_signature(sk, region, amz_date)
+    head_bucket_signature = generate_oos_head_bucket_signature(sk, region, amz_date, head_bucket_name)
 
     signed_requests = {
         "AccessKey": ak,
