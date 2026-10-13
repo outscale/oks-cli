@@ -10,7 +10,7 @@ import json
 import pathlib
 import traceback
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 import OpenSSL
 import shutil
 import prettytable
@@ -18,6 +18,8 @@ import dateutil.parser
 import human_readable
 import base64
 import sys
+import hmac
+import hashlib
 
 from click.shell_completion import CompletionItem
 
@@ -144,6 +146,106 @@ def do_request(method, path, *args, **kwargs):
             errors = {"Error": f"Failed to reach the endpoint {url} ({err.__class__.__name__})"}
             raise JSONClickException(json.dumps(errors))
 
+def sign(key, msg):
+    """Generate HMAC-SHA256 signature of a message using a secret key."""
+    return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
+
+def get_signature_key(key, date_stamp, region_name, service_name, scheme="OSC4"):
+    """Derive signature key (OSC4 or AWS4) using the secret access key and request details."""
+    k_date = sign((scheme + key).encode('utf-8'), date_stamp)
+    k_region = sign(k_date, region_name)
+    k_service = sign(k_region, service_name)
+    k_signing = sign(k_service, f"{scheme.lower()}_request")
+    return k_signing
+
+def hash_sha256(message):
+    """Return the SHA-256 hash (hex) of the input message."""
+    return hashlib.sha256(message.encode('utf-8')).hexdigest()
+
+def create_string_to_sign(amz_date, credential_scope, canonical_request_hash, scheme="OSC4"):
+    """Build the 'String to Sign' from request metadata and canonical request hash."""
+    return f"{scheme}-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{canonical_request_hash}"
+
+def generate_signature(ak, sk, region, service, amz_date, uri_path):
+    """
+    Generate AWS Signature Version 4 for a request using credentials and metadata.
+    
+    Returns a dictionary with AccessKey, Signature, and StringToSign.
+    """
+    method = "POST"
+    canonical_uri = uri_path
+    canonical_querystring = ""
+    canonical_headers = f"content-type:application/json\nhost:{service}.{region}.outscale.com\nx-osc-date:{amz_date}\n"
+    signed_headers = "content-type;host;x-osc-date"
+    payload_hash = hash_sha256('')  # Empty body
+
+    canonical_request = f"{method}\n{canonical_uri}\n{canonical_querystring}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+    canonical_request_hash = hash_sha256(canonical_request)
+
+    date_stamp = amz_date[:8]
+    credential_scope = f"{date_stamp}/{region}/{service}/osc4_request"
+    string_to_sign = create_string_to_sign(amz_date, credential_scope, canonical_request_hash)
+
+    signing_key = get_signature_key(sk, date_stamp, region, service)
+    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    return signature
+
+def generate_oos_head_bucket_signature(ak, sk, region, amz_date, bucket):
+    """
+    Generate AWS Signature Version 4 for an OOS (S3) HeadBucket request (path-style).
+
+    Returns a dictionary with AccessKey, Signature, StringToSign and PayloadHash.
+    """
+    service = "s3"
+    method = "HEAD"
+    canonical_uri = f"/{bucket}"
+    canonical_querystring = ""
+    payload_hash = hash_sha256('')  # Empty body
+    canonical_headers = f"host:oos.{region}.outscale.com\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n"
+    signed_headers = "host;x-amz-content-sha256;x-amz-date"
+
+    canonical_request = f"{method}\n{canonical_uri}\n{canonical_querystring}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+    canonical_request_hash = hash_sha256(canonical_request)
+
+    date_stamp = amz_date[:8]
+    credential_scope = f"{date_stamp}/{region}/{service}/aws4_request"
+    string_to_sign = create_string_to_sign(amz_date, credential_scope, canonical_request_hash, scheme="AWS4")
+
+    signing_key = get_signature_key(sk, date_stamp, region, service, scheme="AWS4")
+    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    return signature
+
+def build_signed_requests_token(ak, sk, region):
+    """
+    Sign ReadAccounts (OSC API) and HeadBucket (OOS) requests with ak/sk.
+
+    Returns both signatures packed into a base64-encoded JSON token.
+    """
+    read_accounts_path = "/api/v1/ReadAccounts"
+    head_bucket_name = "s3-bucket-oks-eim-user-check"
+
+    amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+
+    read_accounts_signature = generate_signature(ak, sk, region, "api", amz_date, read_accounts_path)
+    head_bucket_signature = generate_oos_head_bucket_signature(ak, sk, region, amz_date, head_bucket_name)
+
+    signed_requests = {
+        "AccessKey": ak,
+        "AmzDate": amz_date,
+        "Region": region,
+        "ReadAccounts": {
+            "Signature": read_accounts_signature,
+        },
+        "HeadBucket": {
+            "Signature": head_bucket_signature,
+            "Bucket": head_bucket_name,
+        },
+    }
+
+    return base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
+
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
     headers = {
@@ -163,9 +265,14 @@ def build_headers():
     if is_jwt_enabled() and is_tokens_valid():
         headers["AccessToken"] = get_token('access_token')
         headers["RefreshToken"] = get_token('refresh_token')
-    elif os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_ACCESS_KEY"):
-        headers["AccessKey"] =  os.getenv("OKS_ACCESS_KEY")
-        headers["SecretKey"] =  os.getenv("OKS_SECRET_KEY")
+    elif os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY"):
+        region = os.getenv("OKS_REGION")
+        if not region:
+            raise click.ClickException("region_name is required in the profile to sign requests with ak/sk")
+
+        token = build_signed_requests_token(os.getenv("OKS_ACCESS_KEY"), os.getenv("OKS_SECRET_KEY"), region)
+        headers["Authorization"] = f"OSC-Signed-Requests {token}"
+
     elif os.getenv("OKS_USERNAME") and os.getenv("OKS_PASSWORD"):
         username = os.getenv("OKS_USERNAME")
         password = os.getenv("OKS_PASSWORD")
