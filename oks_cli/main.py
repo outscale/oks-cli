@@ -19,8 +19,9 @@ from .utils import ctx_update, install_completions, profile_completer, cluster_c
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--verbose', '-v', count=True, help="Increase verbosity")
+@click.option('--aws-sigv4', is_flag=True, help="Authenticate with AWS SigV4 signed requests")
 @click.pass_context
-def cli(ctx, project_name, cluster_name, profile, verbose):
+def cli(ctx, project_name, cluster_name, profile, verbose, aws_sigv4):
     """
     CLI tool to manage projects and clusters.
 
@@ -28,6 +29,9 @@ def cli(ctx, project_name, cluster_name, profile, verbose):
     Each scope has several actions like 'list', 'get', 'create', etc.
     """
     ctx_update(ctx, project_name, cluster_name, profile)
+
+    if aws_sigv4:
+        os.environ["OKS_AWS_SIGV4"] = "1"
 
     LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
 

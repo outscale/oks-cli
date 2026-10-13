@@ -106,6 +106,8 @@ def do_request(method, path, *args, **kwargs):
 
     kwargs.setdefault('headers', {}).update(headers)
 
+    logging.debug("request headers: %s", kwargs['headers'])
+
     logging.info("%s request %s?%s", method, url,
                  urlencode(kwargs.get('params', {})))
 
@@ -212,6 +214,7 @@ def build_signed_requests_token(ak, sk, region):
     Returns both signatures packed into a base64-encoded JSON token.
     """
     head_bucket_name = "s3-bucket-oks-eim-user-check"
+    prefix = "oks-sigv4-v1."
 
     amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 
@@ -231,7 +234,7 @@ def build_signed_requests_token(ak, sk, region):
         },
     }
 
-    return base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
+    return prefix + base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
 
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
@@ -249,17 +252,19 @@ def build_headers():
             if _h and _n:
                 headers[_h.strip()] = _n.strip() 
 
-    if is_jwt_enabled() and is_tokens_valid():
-        headers["AccessToken"] = get_token('access_token')
-        headers["RefreshToken"] = get_token('refresh_token')
-    elif os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY"):
+    if os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY") and os.getenv("OKS_AWS_SIGV4"):
         region = os.getenv("OKS_REGION")
         if not region:
             raise click.ClickException("region_name is required in the profile to sign requests with ak/sk")
 
         token = build_signed_requests_token(os.getenv("OKS_ACCESS_KEY"), os.getenv("OKS_SECRET_KEY"), region)
-        headers["Authorization"] = f"OSC-Signed-Requests {token}"
-
+        headers["Authorization"] = f"Bearer {token}"
+    elif is_jwt_enabled() and is_tokens_valid():
+        headers["AccessToken"] = get_token('access_token')
+        headers["RefreshToken"] = get_token('refresh_token')
+    elif os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY"):
+        headers["AccessKey"] = os.getenv("OKS_ACCESS_KEY")
+        headers["SecretKey"] = os.getenv("OKS_SECRET_KEY")
     elif os.getenv("OKS_USERNAME") and os.getenv("OKS_PASSWORD"):
         username = os.getenv("OKS_USERNAME")
         password = os.getenv("OKS_PASSWORD")
