@@ -6,7 +6,7 @@ from nacl.encoding import Base64Encoder
 
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import dateutil.parser
 import human_readable
 import pathlib
@@ -23,7 +23,8 @@ from .utils import cluster_completer, do_request, print_output,                 
                    ctx_update, set_cluster_id, get_cluster_id, get_project_id,  \
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
-                   kubeconfig_parse_fields, print_table, format_row, apply_set_fields
+                   kubeconfig_parse_fields, print_table, format_row, apply_set_fields, \
+                   build_signed_requests_token
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -716,6 +717,40 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
             click.echo(json.dumps(yaml.safe_load(kubeconfig)))
         else:
             click.echo(kubeconfig)
+
+# GET TOKEN
+@cluster.command('token', help="Print an AWS SigV4 token as a Kubernetes ExecCredential")
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.pass_context
+def cluster_token_command(ctx, profile):
+    """CLI command to print a SigV4 token in the client.authentication.k8s.io/v1 ExecCredential format."""
+    _, _, profile = ctx_update(ctx, None, None, profile)
+    login_profile(profile)
+
+    access_key = os.getenv("OKS_ACCESS_KEY")
+    secret_key = os.getenv("OKS_SECRET_KEY")
+    region = os.getenv("OKS_REGION")
+
+    if not access_key or not secret_key:
+        raise click.ClickException("An ak/sk profile is required to generate a token")
+    if not region:
+        raise click.ClickException("region_name is required in the profile to generate a token")
+
+    # SigV4 signatures are accepted for 15 minutes, expire the token slightly earlier
+    expiration = datetime.now(timezone.utc) + timedelta(minutes=14)
+    token = build_signed_requests_token(access_key, secret_key, region)
+
+    exec_credential = {
+        "apiVersion": "client.authentication.k8s.io/v1",
+        "kind": "ExecCredential",
+        "spec": {},
+        "status": {
+            "expirationTimestamp": expiration.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "token": token,
+        },
+    }
+
+    click.echo(json.dumps(exec_credential))
 
 
 def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=False):
