@@ -191,47 +191,57 @@ def generate_aws4_signature(sk, region, service, amz_date, method, canonical_uri
     signing_key = get_signature_key(sk, date_stamp, region, service)
     return hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
 
-def generate_read_accounts_signature(sk, region, amz_date):
+def generate_read_accounts_signature(sk, region, amz_date, extra_headers=None):
     """Generate AWS4 signature for an OUTSCALE API ReadAccounts request."""
     return generate_aws4_signature(sk, region, "api", amz_date, "POST", "/api/v1/ReadAccounts", {
         "content-type": "application/json",
         "host": f"api.{region}.outscale.com",
         "x-amz-date": amz_date,
+        **(extra_headers or {}),
     })
 
-def generate_oos_head_bucket_signature(sk, region, amz_date, bucket):
+def generate_oos_head_bucket_signature(sk, region, amz_date, bucket, extra_headers=None):
     """Generate AWS4 signature for an OOS (S3) HeadBucket request (path-style)."""
     return generate_aws4_signature(sk, region, "s3", amz_date, "HEAD", f"/{bucket}", {
         "host": f"oos.{region}.outscale.com",
         "x-amz-content-sha256": hash_sha256(''),
         "x-amz-date": amz_date,
+        **(extra_headers or {}),
     })
 
-def generate_eim_get_user_signature(sk, region, amz_date):
+def generate_eim_get_user_signature(sk, region, amz_date, extra_headers=None):
     """Generate AWS4 signature for an OUTSCALE EIM GetUser request."""
     # The verifier must replay this exact body, its hash is part of the signature
     body = "Version=2010-05-08&Action=GetUser"
     return generate_aws4_signature(sk, region, "eim", amz_date, "POST", "/", {
         "host": f"eim.{region}.outscale.com",
         "x-amz-date": amz_date,
+        **(extra_headers or {}),
     }, payload=body)
+
+def signed_url_headers(url):
+    OKS_URL_HEADER = "x-oks-target"
+    """Return the extra signed headers binding a token to `url`, if any."""
+    return {OKS_URL_HEADER: url.strip()} if url else {}
 
 def encode_signed_requests_token(prefix, signed_requests):
     """Pack signed request data into a prefixed base64-encoded JSON token."""
     return prefix + base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
 
-def build_signed_requests_token_v1(ak, sk, region):
+def build_signed_requests_token_v1(ak, sk, region, url=None):
     """
     Sign ReadAccounts (OSC API) and HeadBucket (OOS) requests with ak/sk.
 
+    When `url` is set, it is signed into both requests as the X-OKS-Target header.
     Returns both signatures packed into an oks-sigv4-v1 token.
     """
     head_bucket_name = "s3-bucket-oks-eim-user-check"
+    extra_headers = signed_url_headers(url)
 
     amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 
-    read_accounts_signature = generate_read_accounts_signature(sk, region, amz_date)
-    head_bucket_signature = generate_oos_head_bucket_signature(sk, region, amz_date, head_bucket_name)
+    read_accounts_signature = generate_read_accounts_signature(sk, region, amz_date, extra_headers)
+    head_bucket_signature = generate_oos_head_bucket_signature(sk, region, amz_date, head_bucket_name, extra_headers)
 
     return encode_signed_requests_token("oks-sigv4-v1.", {
         "AccessKey": ak,
@@ -246,10 +256,11 @@ def build_signed_requests_token_v1(ak, sk, region):
         },
     })
 
-def build_signed_requests_token_v2(ak, sk, region):
+def build_signed_requests_token_v2(ak, sk, region, url=None):
     """
     Sign an EIM GetUser request with ak/sk.
 
+    When `url` is set, it is signed into the request as the X-OKS-Target header.
     Returns the signature packed into an oks-sigv4-v2 token.
     """
     amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
@@ -258,7 +269,7 @@ def build_signed_requests_token_v2(ak, sk, region):
         "AccessKey": ak,
         "AmzDate": amz_date,
         "Region": region,
-        "Signature": generate_eim_get_user_signature(sk, region, amz_date),
+        "Signature": generate_eim_get_user_signature(sk, region, amz_date, signed_url_headers(url)),
     })
 
 SIGV4_TOKEN_BUILDERS = {
@@ -266,11 +277,11 @@ SIGV4_TOKEN_BUILDERS = {
     "v2": build_signed_requests_token_v2,
 }
 
-def build_signed_requests_token(ak, sk, region, version="v1"):
-    """Build a SigV4 signed requests token of the given version."""
+def build_signed_requests_token(ak, sk, region, version="v1", url=None):
+    """Build a SigV4 signed requests token of the given version, optionally bound to `url`."""
     if version not in SIGV4_TOKEN_BUILDERS:
         raise click.ClickException(f"Unsupported SigV4 token version: {version}")
-    return SIGV4_TOKEN_BUILDERS[version](ak, sk, region)
+    return SIGV4_TOKEN_BUILDERS[version](ak, sk, region, url)
 
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""

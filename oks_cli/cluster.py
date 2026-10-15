@@ -720,9 +720,10 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
 
 # GET TOKEN
 @cluster.command('token', help="Print an AWS SigV4 token as a Kubernetes ExecCredential")
+@click.option('--url', help="URL to sign into the token as the X-OKS-Target header")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_token_command(ctx, profile):
+def cluster_token_command(ctx, url, profile):
     """CLI command to print a SigV4 token in the client.authentication.k8s.io/v1 ExecCredential format."""
     _, _, profile = ctx_update(ctx, None, None, profile)
     login_profile(profile)
@@ -738,7 +739,7 @@ def cluster_token_command(ctx, profile):
 
     # SigV4 signatures are accepted for 15 minutes, expire the token slightly earlier
     expiration = datetime.now(timezone.utc) + timedelta(minutes=14)
-    token = build_signed_requests_token(access_key, secret_key, region, os.getenv("OKS_AWS_SIGV4", "v1"))
+    token = build_signed_requests_token(access_key, secret_key, region, os.getenv("OKS_AWS_SIGV4", "v1"), url)
 
     exec_credential = {
         "apiVersion": "client.authentication.k8s.io/v1",
