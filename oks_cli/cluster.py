@@ -623,6 +623,34 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
             set_cluster_id("")
         print_output(data, output)
 
+def _build_token_kubeconfig(url, profile, cluster_name):
+    """Build a kubeconfig for `url` whose credentials come from `oks-cli cluster token`."""
+    token_env = [{"name": "OKS_PROFILE", "value": profile}]
+    if os.getenv("OKS_AWS_SIGV4"):
+        token_env.append({"name": "OKS_AWS_SIGV4", "value": os.getenv("OKS_AWS_SIGV4")})
+
+    cluster_name = cluster_name or "default"
+
+    return {
+        "apiVersion": "v1",
+        "kind": "Config",
+        "clusters": [{"name": cluster_name, "cluster": {"server": url}}],
+        "contexts": [{"name": cluster_name, "context": {"cluster": cluster_name, "user": "default"}}],
+        "current-context": cluster_name,
+        "users": [{
+            "name": "default",
+            "user": {
+                "exec": {
+                    "apiVersion": "client.authentication.k8s.io/v1",
+                    "command": "oks-cli",
+                    "args": ["cluster", "token", "--url", url],
+                    "env": token_env,
+                    "interactiveMode": "Never",
+                },
+            },
+        }],
+    }
+
 # GET KUBECONFIG
 @cluster.command('kubeconfig', help="Fetch the kubeconfig for a cluster")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
@@ -635,12 +663,23 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 @click.option('--user', type=click.STRING, help="User")
 @click.option('--group', type=click.STRING, help="Group")
 @click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
+@click.option('--url', help="Kubernetes API server URL, generate a kubeconfig authenticated by 'oks-cli cluster token' instead of fetching one")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, output, wide, refresh, nacl, user, group, ttl, profile):
+def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, output, wide, refresh, nacl, user, group, ttl, url, profile):
     """CLI command to fetch and optionally print the kubeconfig for a specified cluster."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
+
+    if url:
+        if print_path or output == 'table':
+            raise click.UsageError("--url supports only yaml and json output")
+        kubeconfig = _build_token_kubeconfig(url, os.environ["OKS_PROFILE"], cluster_name)
+        if output == 'json':
+            click.echo(json.dumps(kubeconfig))
+        else:
+            click.echo(yaml.safe_dump(kubeconfig, sort_keys=False), nl=False)
+        return
 
     project_id = find_project_id_by_name(project_name)
     cluster_id = find_cluster_id_by_name(project_id, cluster_name)
@@ -800,7 +839,6 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=
             click.echo(e.stdout, err=True)
 
         raise SystemExit(e.returncode)
-
 
 @cluster.command('kubectl', help='Fetch the kubeconfig for a cluster and run kubectl against it', context_settings={"ignore_unknown_options": True})
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
