@@ -738,7 +738,7 @@ def cluster_token_command(ctx, profile):
 
     # SigV4 signatures are accepted for 15 minutes, expire the token slightly earlier
     expiration = datetime.now(timezone.utc) + timedelta(minutes=14)
-    token = build_signed_requests_token(access_key, secret_key, region)
+    token = build_signed_requests_token(access_key, secret_key, region, os.getenv("OKS_AWS_SIGV4", "v1"))
 
     exec_credential = {
         "apiVersion": "client.authentication.k8s.io/v1",

@@ -168,15 +168,15 @@ def create_string_to_sign(amz_date, credential_scope, canonical_request_hash):
     """Build the AWS4 'String to Sign' from request metadata and canonical request hash."""
     return f"AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{canonical_request_hash}"
 
-def generate_aws4_signature(sk, region, service, amz_date, method, canonical_uri, headers):
+def generate_aws4_signature(sk, region, service, amz_date, method, canonical_uri, headers, payload=''):
     """
-    Generate AWS Signature Version 4 for a request with an empty body.
+    Generate AWS Signature Version 4 for a request.
 
     All entries of `headers` (lowercase name -> value) are signed.
     Returns the hex signature.
     """
     canonical_querystring = ""
-    payload_hash = hash_sha256('')  # Empty body
+    payload_hash = hash_sha256(payload)
     signed_header_names = sorted(headers)
     canonical_headers = "".join(f"{name}:{headers[name]}\n" for name in signed_header_names)
     signed_headers = ";".join(signed_header_names)
@@ -207,21 +207,33 @@ def generate_oos_head_bucket_signature(sk, region, amz_date, bucket):
         "x-amz-date": amz_date,
     })
 
-def build_signed_requests_token(ak, sk, region):
+def generate_eim_get_user_signature(sk, region, amz_date):
+    """Generate AWS4 signature for an OUTSCALE EIM GetUser request."""
+    # The verifier must replay this exact body, its hash is part of the signature
+    body = "Version=2010-05-08&Action=GetUser"
+    return generate_aws4_signature(sk, region, "eim", amz_date, "POST", "/", {
+        "host": f"eim.{region}.outscale.com",
+        "x-amz-date": amz_date,
+    }, payload=body)
+
+def encode_signed_requests_token(prefix, signed_requests):
+    """Pack signed request data into a prefixed base64-encoded JSON token."""
+    return prefix + base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
+
+def build_signed_requests_token_v1(ak, sk, region):
     """
     Sign ReadAccounts (OSC API) and HeadBucket (OOS) requests with ak/sk.
 
-    Returns both signatures packed into a base64-encoded JSON token.
+    Returns both signatures packed into an oks-sigv4-v1 token.
     """
     head_bucket_name = "s3-bucket-oks-eim-user-check"
-    prefix = "oks-sigv4-v1."
 
     amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 
     read_accounts_signature = generate_read_accounts_signature(sk, region, amz_date)
     head_bucket_signature = generate_oos_head_bucket_signature(sk, region, amz_date, head_bucket_name)
 
-    signed_requests = {
+    return encode_signed_requests_token("oks-sigv4-v1.", {
         "AccessKey": ak,
         "AmzDate": amz_date,
         "Region": region,
@@ -232,9 +244,33 @@ def build_signed_requests_token(ak, sk, region):
             "Signature": head_bucket_signature,
             "Bucket": head_bucket_name,
         },
-    }
+    })
 
-    return prefix + base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
+def build_signed_requests_token_v2(ak, sk, region):
+    """
+    Sign an EIM GetUser request with ak/sk.
+
+    Returns the signature packed into an oks-sigv4-v2 token.
+    """
+    amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+
+    return encode_signed_requests_token("oks-sigv4-v2.", {
+        "AccessKey": ak,
+        "AmzDate": amz_date,
+        "Region": region,
+        "Signature": generate_eim_get_user_signature(sk, region, amz_date),
+    })
+
+SIGV4_TOKEN_BUILDERS = {
+    "v1": build_signed_requests_token_v1,
+    "v2": build_signed_requests_token_v2,
+}
+
+def build_signed_requests_token(ak, sk, region, version="v1"):
+    """Build a SigV4 signed requests token of the given version."""
+    if version not in SIGV4_TOKEN_BUILDERS:
+        raise click.ClickException(f"Unsupported SigV4 token version: {version}")
+    return SIGV4_TOKEN_BUILDERS[version](ak, sk, region)
 
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
@@ -257,7 +293,8 @@ def build_headers():
         if not region:
             raise click.ClickException("region_name is required in the profile to sign requests with ak/sk")
 
-        token = build_signed_requests_token(os.getenv("OKS_ACCESS_KEY"), os.getenv("OKS_SECRET_KEY"), region)
+        token = build_signed_requests_token(os.getenv("OKS_ACCESS_KEY"), os.getenv("OKS_SECRET_KEY"), region,
+                                            os.getenv("OKS_AWS_SIGV4"))
         headers["Authorization"] = f"Bearer {token}"
     elif is_jwt_enabled() and is_tokens_valid():
         headers["AccessToken"] = get_token('access_token')
