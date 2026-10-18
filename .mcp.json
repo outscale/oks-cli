@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "oks-cli": {
+      "command": "python",
+      "args": ["-m", "oks_cli.mcp_server"]
+    }
+  }
+}
