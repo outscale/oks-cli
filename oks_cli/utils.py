@@ -1,4 +1,5 @@
 import click
+import codecs
 import os
 import subprocess
 import logging
@@ -753,6 +754,15 @@ def remove_jwt_token(token_type):
 
 def detect_and_parse_input(input_data):
     """Parse input as JSON or YAML; raise error if invalid."""
+    if isinstance(input_data, bytes):
+        try:
+            if input_data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+                input_data = input_data.decode("utf-16")
+            else:
+                input_data = input_data.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise click.BadParameter("Input file is neither valid JSON nor YAML.")
+
     try:
         return json.loads(input_data)
     except json.JSONDecodeError:

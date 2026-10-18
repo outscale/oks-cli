@@ -381,7 +381,7 @@ def _create_cluster(project_name, cluster_config, output):
 @click.option('--cp-multi-az', '-m', is_flag=True, help="Enable control plane multi AZ")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
-@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the cluster ")
+@click.option('--filename', '-f', type=click.File("rb"), help="Path to file to use to create the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
@@ -479,7 +479,7 @@ def cluster_create_command(ctx, project_name, cluster_name, description, admin, 
 @click.option('--control-plane', shell_complete=shell_completions, help="Controlplane plan")
 @click.option('--dry-run', is_flag=True, help="Client dry-run, only print the object that would be sent, without sending it")
 @click.option('--output', '-o',  type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
-@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to update the cluster ")
+@click.option('--filename', '-f', type=click.File("rb"), help="Path to file to use to update the cluster ")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--set', 'set_fields', multiple=True, help="Set arbitrary nested fields, e.g. auth.oidc.issuer-url=value")
 @click.pass_context
@@ -822,7 +822,7 @@ def nodepool_list(ctx):
 @click.option('--zone', '-z', multiple=True, help="Provide zone(s)")
 @click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
 @click.option('--dry-run', is_flag=True, help="Run without any action")
-@click.option('--filename', '-f', type=click.File("r"), help="Path to file to use to create the Nodepool")
+@click.option('--filename', '-f', type=click.File("rb"), help="Path to file to use to create the Nodepool")
 @click.pass_context
 def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, filename):
     """Create a new nodepool in the cluster, optionally from a file or parameters."""
