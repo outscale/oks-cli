@@ -6,7 +6,7 @@ from nacl.encoding import Base64Encoder
 
 import time
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import dateutil.parser
 import human_readable
 import pathlib
@@ -24,7 +24,7 @@ from .utils import cluster_completer, do_request, print_output,                 
                    get_template, get_cluster_name, format_changed_row,          \
                    is_interesting_status, profile_completer, project_completer, \
                    kubeconfig_parse_fields, print_table, format_row, apply_set_fields, \
-                   build_signed_requests_token
+                   build_signed_requests_token, get_sigv4_token_expiration
 
 from .profile import add_profile
 from .project import project_create, project_login
@@ -625,10 +625,6 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
 
 def _build_token_kubeconfig(url, profile, cluster_name):
     """Build a kubeconfig for `url` whose credentials come from `oks-cli cluster token`."""
-    token_env = [{"name": "OKS_PROFILE", "value": profile}]
-    if os.getenv("OKS_AWS_SIGV4"):
-        token_env.append({"name": "OKS_AWS_SIGV4", "value": os.getenv("OKS_AWS_SIGV4")})
-
     cluster_name = cluster_name or "default"
 
     return {
@@ -644,7 +640,7 @@ def _build_token_kubeconfig(url, profile, cluster_name):
                     "apiVersion": "client.authentication.k8s.io/v1",
                     "command": "oks-cli",
                     "args": ["cluster", "token", "--url", url],
-                    "env": token_env,
+                    "env": [{"name": "OKS_PROFILE", "value": profile}],
                     "interactiveMode": "Never",
                 },
             },
@@ -776,9 +772,8 @@ def cluster_token_command(ctx, url, profile):
     if not region:
         raise click.ClickException("region_name is required in the profile to generate a token")
 
-    # SigV4 signatures are accepted for 15 minutes, expire the token slightly earlier
-    expiration = datetime.now(timezone.utc) + timedelta(minutes=14)
-    token = build_signed_requests_token(access_key, secret_key, region, os.getenv("OKS_AWS_SIGV4", "v1"), url)
+    token = build_signed_requests_token(access_key, secret_key, region, url)
+    expiration = get_sigv4_token_expiration(token)
 
     exec_credential = {
         "apiVersion": "client.authentication.k8s.io/v1",

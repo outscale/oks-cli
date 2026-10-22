@@ -3,7 +3,6 @@ import click
 import os
 import json
 import logging
-import re
 from .project import project
 from .cluster import cluster
 from .profile import profile
@@ -12,28 +11,16 @@ from .quotas import quotas
 from .netpeering import netpeering
 from .user import user
 
-from .utils import ctx_update, install_completions, profile_completer, cluster_completer, project_completer, \
-                   SIGV4_TOKEN_BUILDERS
-
-class CLIGroup(click.Group):
-    def parse_args(self, ctx, args):
-        # Click would consume the subcommand name as the value of a bare `--aws-sigv4`
-        for i, arg in enumerate(args):
-            if arg == "--aws-sigv4" and (i + 1 == len(args) or not re.fullmatch(r"v\d+", args[i + 1])):
-                args = args[:i + 1] + ["v1"] + args[i + 1:]
-                break
-        return super().parse_args(ctx, args)
+from .utils import ctx_update, install_completions, profile_completer, cluster_completer, project_completer
 
 # Main CLI entry point
-@click.group(cls=CLIGroup, invoke_without_command=True)
+@click.group(invoke_without_command=True)
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--verbose', '-v', count=True, help="Increase verbosity")
-@click.option('--aws-sigv4', type=click.Choice(list(SIGV4_TOKEN_BUILDERS)),
-              help="Authenticate with an AWS SigV4 signed token: v1 (ReadAccounts + HeadBucket, used when no version is given) or v2 (EIM GetUser)")
 @click.pass_context
-def cli(ctx, project_name, cluster_name, profile, verbose, aws_sigv4):
+def cli(ctx, project_name, cluster_name, profile, verbose):
     """
     CLI tool to manage projects and clusters.
 
@@ -41,9 +28,6 @@ def cli(ctx, project_name, cluster_name, profile, verbose, aws_sigv4):
     Each scope has several actions like 'list', 'get', 'create', etc.
     """
     ctx_update(ctx, project_name, cluster_name, profile)
-
-    if aws_sigv4:
-        os.environ["OKS_AWS_SIGV4"] = aws_sigv4
 
     LOGLEVEL = os.environ.get('LOGLEVEL', 'WARNING').upper()
 

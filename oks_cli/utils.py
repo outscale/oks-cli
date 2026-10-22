@@ -10,7 +10,7 @@ import json
 import pathlib
 import traceback
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import OpenSSL
 import shutil
 import prettytable
@@ -121,6 +121,7 @@ def do_request(method, path, *args, **kwargs):
                         data.reason, data.text[:50])
             data.raise_for_status()
             save_tokens(data.headers)
+            save_request_sigv4_token(kwargs['headers'])
             obj = find_response_object(data)
             return obj
         except requests.exceptions.HTTPError as err:
@@ -134,6 +135,10 @@ def do_request(method, path, *args, **kwargs):
             jwt_response = handle_jwt_error(err, method, path, args, kwargs)
             if jwt_response is not None:
                 return jwt_response
+
+            sigv4_response = handle_sigv4_error(err, method, path, args, kwargs)
+            if sigv4_response is not None:
+                return sigv4_response
 
             if attempt < retries and method.upper() == "GET":
                 logging.info("GET failed (attempt %s/%s), retrying in %s sec...", attempt, retries, backoff)
@@ -191,24 +196,6 @@ def generate_aws4_signature(sk, region, service, amz_date, method, canonical_uri
     signing_key = get_signature_key(sk, date_stamp, region, service)
     return hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
 
-def generate_read_accounts_signature(sk, region, amz_date, extra_headers=None):
-    """Generate AWS4 signature for an OUTSCALE API ReadAccounts request."""
-    return generate_aws4_signature(sk, region, "api", amz_date, "POST", "/api/v1/ReadAccounts", {
-        "content-type": "application/json",
-        "host": f"api.{region}.outscale.com",
-        "x-amz-date": amz_date,
-        **(extra_headers or {}),
-    })
-
-def generate_oos_head_bucket_signature(sk, region, amz_date, bucket, extra_headers=None):
-    """Generate AWS4 signature for an OOS (S3) HeadBucket request (path-style)."""
-    return generate_aws4_signature(sk, region, "s3", amz_date, "HEAD", f"/{bucket}", {
-        "host": f"oos.{region}.outscale.com",
-        "x-amz-content-sha256": hash_sha256(''),
-        "x-amz-date": amz_date,
-        **(extra_headers or {}),
-    })
-
 def generate_eim_get_user_signature(sk, region, amz_date, extra_headers=None):
     """Generate AWS4 signature for an OUTSCALE EIM GetUser request."""
     # The verifier must replay this exact body, its hash is part of the signature
@@ -228,35 +215,7 @@ def encode_signed_requests_token(prefix, signed_requests):
     """Pack signed request data into a prefixed base64-encoded JSON token."""
     return prefix + base64.b64encode(json.dumps(signed_requests).encode('utf-8')).decode('utf-8')
 
-def build_signed_requests_token_v1(ak, sk, region, url=None):
-    """
-    Sign ReadAccounts (OSC API) and HeadBucket (OOS) requests with ak/sk.
-
-    When `url` is set, it is signed into both requests as the X-OKS-Target header.
-    Returns both signatures packed into an oks-sigv4-v1 token.
-    """
-    head_bucket_name = "s3-bucket-oks-eim-user-check"
-    extra_headers = signed_url_headers(url)
-
-    amz_date = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-
-    read_accounts_signature = generate_read_accounts_signature(sk, region, amz_date, extra_headers)
-    head_bucket_signature = generate_oos_head_bucket_signature(sk, region, amz_date, head_bucket_name, extra_headers)
-
-    return encode_signed_requests_token("oks-sigv4-v1.", {
-        "AccessKey": ak,
-        "AmzDate": amz_date,
-        "Region": region,
-        "ReadAccounts": {
-            "Signature": read_accounts_signature,
-        },
-        "HeadBucket": {
-            "Signature": head_bucket_signature,
-            "Bucket": head_bucket_name,
-        },
-    })
-
-def build_signed_requests_token_v2(ak, sk, region, url=None):
+def build_signed_requests_token(ak, sk, region, url=None):
     """
     Sign an EIM GetUser request with ak/sk.
 
@@ -271,17 +230,6 @@ def build_signed_requests_token_v2(ak, sk, region, url=None):
         "Region": region,
         "Signature": generate_eim_get_user_signature(sk, region, amz_date, signed_url_headers(url)),
     })
-
-SIGV4_TOKEN_BUILDERS = {
-    "v1": build_signed_requests_token_v1,
-    "v2": build_signed_requests_token_v2,
-}
-
-def build_signed_requests_token(ak, sk, region, version="v1", url=None):
-    """Build a SigV4 signed requests token of the given version, optionally bound to `url`."""
-    if version not in SIGV4_TOKEN_BUILDERS:
-        raise click.ClickException(f"Unsupported SigV4 token version: {version}")
-    return SIGV4_TOKEN_BUILDERS[version](ak, sk, region, url)
 
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
@@ -299,20 +247,20 @@ def build_headers():
             if _h and _n:
                 headers[_h.strip()] = _n.strip() 
 
-    if os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY") and os.getenv("OKS_AWS_SIGV4"):
+    if os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY"):
         region = os.getenv("OKS_REGION")
         if not region:
             raise click.ClickException("region_name is required in the profile to sign requests with ak/sk")
 
-        token = build_signed_requests_token(os.getenv("OKS_ACCESS_KEY"), os.getenv("OKS_SECRET_KEY"), region,
-                                            os.getenv("OKS_AWS_SIGV4"))
+        token = get_sigv4_token(os.getenv("OKS_ACCESS_KEY"), region)
+        if token:
+            logging.info("using cached sigv4 token")
+        else:
+            token = build_signed_requests_token(os.getenv("OKS_ACCESS_KEY"), os.getenv("OKS_SECRET_KEY"), region)
         headers["Authorization"] = f"Bearer {token}"
     elif is_jwt_enabled() and is_tokens_valid():
         headers["AccessToken"] = get_token('access_token')
         headers["RefreshToken"] = get_token('refresh_token')
-    elif os.getenv("OKS_ACCESS_KEY") and os.getenv("OKS_SECRET_KEY"):
-        headers["AccessKey"] = os.getenv("OKS_ACCESS_KEY")
-        headers["SecretKey"] = os.getenv("OKS_SECRET_KEY")
     elif os.getenv("OKS_USERNAME") and os.getenv("OKS_PASSWORD"):
         username = os.getenv("OKS_USERNAME")
         password = os.getenv("OKS_PASSWORD")
@@ -401,6 +349,20 @@ def handle_jwt_error(err, method, path, args, kwargs):
             headers.pop("RefreshToken", None)
 
             return do_request(method, path, *args, **kwargs)
+    except Exception:
+        return None
+
+def handle_sigv4_error(err, method, path, args, kwargs):
+    """Handle a rejected cached SigV4 token by removing it and retrying with a fresh one."""
+    try:
+        response_body = json.loads(err.response.text)
+        # fresh tokens are cached only after a successful response, so this retries once
+        if response_body.get("message") == "Unauthorized: Invalid SigV4 token." \
+                and remove_sigv4_token():
+            kwargs.get("headers", {}).pop("Authorization", None)
+            return do_request(method, path, *args, **kwargs)
+    except JSONClickException:
+        raise
     except Exception:
         return None
 
@@ -897,6 +859,82 @@ def remove_jwt_token(token_type):
 
     if os.path.exists(TOKEN_FILE):
         os.remove(TOKEN_FILE)
+
+# OUTSCALE accepts a SigV4 signature for 15 minutes, stop using the token slightly earlier
+SIGV4_TOKEN_LIFETIME = timedelta(minutes=14)
+
+def get_sigv4_token_file():
+    """Return the cache file of the SigV4 token for the current profile."""
+    CONFIG_FOLDER, _ = get_config_path()
+
+    if not os.getenv("OKS_PROFILE"):
+        return None
+
+    return f"{CONFIG_FOLDER}/{os.getenv('OKS_PROFILE')}.sigv4_token"
+
+def decode_signed_requests_token(token):
+    """Decode the JSON payload of an oks-sigv4 token."""
+    try:
+        return json.loads(base64.b64decode(token.partition('.')[2]))
+    except ValueError:
+        return None
+
+def get_sigv4_token_expiration(token):
+    """Return when the SigV4 token stops being usable, based on its AmzDate."""
+    payload = decode_signed_requests_token(token)
+    if not isinstance(payload, dict) or not isinstance(payload.get("AmzDate"), str):
+        return None
+    try:
+        signed_at = datetime.strptime(payload["AmzDate"], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return signed_at + SIGV4_TOKEN_LIFETIME
+
+def get_sigv4_token(ak, region):
+    """Return the cached SigV4 token if it was signed with `ak` for `region` and is still valid."""
+    TOKEN_FILE = get_sigv4_token_file()
+
+    if not TOKEN_FILE or not os.path.exists(TOKEN_FILE):
+        return None
+
+    with open(TOKEN_FILE, 'r') as file:
+        token = file.read()
+
+    payload = decode_signed_requests_token(token)
+    if not isinstance(payload, dict) or payload.get("AccessKey") != ak or payload.get("Region") != region:
+        return None
+
+    expiration = get_sigv4_token_expiration(token)
+    if not expiration or expiration < datetime.now(timezone.utc) + timedelta(seconds=5): # 5sec margin
+        return None
+
+    return token
+
+def save_sigv4_token(token):
+    """Save the SigV4 token for the current profile."""
+    TOKEN_FILE = get_sigv4_token_file()
+
+    if not TOKEN_FILE:
+        return
+
+    with os.fdopen(os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as file:
+        file.write(token)
+
+def remove_sigv4_token():
+    """Delete the cached SigV4 token, return True if there was one."""
+    TOKEN_FILE = get_sigv4_token_file()
+
+    if TOKEN_FILE and os.path.exists(TOKEN_FILE):
+        os.remove(TOKEN_FILE)
+        return True
+    return False
+
+def save_request_sigv4_token(headers):
+    """Cache the SigV4 token sent in request headers, once the API accepted it."""
+    authorization = headers.get("Authorization", "")
+    prefix = "Bearer oks-sigv4-"
+    if authorization.startswith(prefix):
+        save_sigv4_token(authorization[len("Bearer "):])
 
 def detect_and_parse_input(input_data):
     """Parse input as JSON or YAML; raise error if invalid."""
