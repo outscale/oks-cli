@@ -623,14 +623,32 @@ def cluster_delete_command(ctx, project_name, cluster_name, output, dry_run, for
             set_cluster_id("")
         print_output(data, output)
 
-def _build_token_kubeconfig(url, profile, cluster_name):
+def _fetch_cluster_endpoint(cluster_id):
+    """Return the server URL and certificate-authority-data of the cluster, read from a kubeconfig issued for 1 second."""
+    kubeconfig_raw = do_request("GET", f'clusters/{cluster_id}/kubeconfig', params={"ttl": "1s"})['data']['kubeconfig']
+    if not kubeconfig_raw:
+        raise click.ClickException("Empty kubeconfig received, could not get the cluster endpoint")
+
+    kubeconfig = yaml.safe_load(kubeconfig_raw)
+    clusters = kubeconfig.get("clusters") or []
+    context_cluster = next((ctx["context"].get("cluster") for ctx in kubeconfig.get("contexts") or []
+                            if ctx.get("name") == kubeconfig.get("current-context")), None)
+    entry = next((c for c in clusters if c.get("name") == context_cluster), clusters[0] if clusters else {})
+
+    server = entry.get("cluster", {}).get("server")
+    ca_data = entry.get("cluster", {}).get("certificate-authority-data")
+    if not server or not ca_data:
+        raise click.ClickException("server or certificate-authority-data not found in the cluster kubeconfig")
+    return server, ca_data
+
+def _build_token_kubeconfig(url, profile, cluster_name, ca_data):
     """Build a kubeconfig for `url` whose credentials come from `oks-cli cluster token`."""
     cluster_name = cluster_name or "default"
 
     return {
         "apiVersion": "v1",
         "kind": "Config",
-        "clusters": [{"name": cluster_name, "cluster": {"server": url}}],
+        "clusters": [{"name": cluster_name, "cluster": {"server": url, "certificate-authority-data": ca_data}}],
         "contexts": [{"name": cluster_name, "context": {"cluster": cluster_name, "user": "default"}}],
         "current-context": cluster_name,
         "users": [{
@@ -659,7 +677,7 @@ def _build_token_kubeconfig(url, profile, cluster_name):
 @click.option('--user', type=click.STRING, help="User")
 @click.option('--group', type=click.STRING, help="Group")
 @click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
-@click.option('--url', help="Kubernetes API server URL, generate a kubeconfig authenticated by 'oks-cli cluster token' instead of fetching one")
+@click.option('--url', is_flag=True, help="Generate a kubeconfig authenticated by 'oks-cli cluster token' for the cluster API server URL")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
 def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, output, wide, refresh, nacl, user, group, ttl, url, profile):
@@ -670,7 +688,10 @@ def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, outp
     if url:
         if print_path or output == 'table':
             raise click.UsageError("--url supports only yaml and json output")
-        kubeconfig = _build_token_kubeconfig(url, os.environ["OKS_PROFILE"], cluster_name)
+        project_id = find_project_id_by_name(project_name)
+        cluster_id = find_cluster_id_by_name(project_id, cluster_name)
+        server, ca_data = _fetch_cluster_endpoint(cluster_id)
+        kubeconfig = _build_token_kubeconfig(server, os.environ["OKS_PROFILE"], cluster_name, ca_data)
         if output == 'json':
             click.echo(json.dumps(kubeconfig))
         else:
