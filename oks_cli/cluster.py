@@ -665,6 +665,61 @@ def _build_token_kubeconfig(url, profile, cluster_name, ca_data):
         }],
     }
 
+def _is_token_kubeconfig_valid(kubeconfig_str, profile):
+    """Check if the cached token kubeconfig runs `oks-cli cluster token` with `profile`."""
+    try:
+        env = yaml.safe_load(kubeconfig_str)["users"][0]["user"]["exec"]["env"]
+    except (yaml.YAMLError, KeyError, IndexError, TypeError):
+        return False
+    return {"name": "OKS_PROFILE", "value": profile} in env
+
+def _get_token_kubeconfig(project_id, cluster_id, cluster_name, refresh=False):
+    """Return the path and content of the cached token kubeconfig, generating it when missing, stale or on `refresh`."""
+    profile = os.environ["OKS_PROFILE"]
+    kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig-token', None, None)
+
+    if kubeconfig_path and not refresh:
+        with open(kubeconfig_path) as f:
+            kubeconfig = f.read()
+        if _is_token_kubeconfig_valid(kubeconfig, profile):
+            return kubeconfig_path, kubeconfig
+
+    logging.info("generating token kubeconfig")
+    server, ca_data = _fetch_cluster_endpoint(cluster_id)
+    kubeconfig = yaml.safe_dump(_build_token_kubeconfig(server, profile, cluster_name, ca_data), sort_keys=False)
+    return save_cache(project_id, cluster_id, 'kubeconfig-token', kubeconfig, None, None), kubeconfig
+
+def _fetch_cert_kubeconfig(cluster_id, user, group, ttl, nacl):
+    """Fetch a kubeconfig authenticated by a client certificate from the API."""
+    logging.info("extracting kubeconfig by api")
+
+    params = {}
+    if user:
+        params["user"] = user
+    if group:
+        params["group"] = group
+    if ttl:
+        params["ttl"] = ttl
+
+    if nacl:
+        ephemeral = PrivateKey.generate()
+        unsealbox = SealedBox(ephemeral)
+
+        headers = {
+          'x-encrypt-nacl': ephemeral.public_key.encode(Base64Encoder).decode('ascii')
+        }
+        kubeconfig_raw = do_request("POST", f'clusters/{cluster_id}/kubeconfig', params = params, headers = headers)['data']['kubeconfig']
+    else:
+        kubeconfig_raw = do_request("GET", f'clusters/{cluster_id}/kubeconfig', params = params)['data']['kubeconfig']
+
+    if not kubeconfig_raw:
+        logging.error("empty response")
+        raise SystemExit()
+    elif nacl:
+        logging.info("decrypting received kubeconfig")
+        return unsealbox.decrypt(kubeconfig_raw.encode('ascii'), encoder = Base64Encoder).decode('ascii')
+    return kubeconfig_raw
+
 # GET KUBECONFIG
 @cluster.command('kubeconfig', help="Fetch the kubeconfig for a cluster")
 @click.option('--project-name', '-p', required=False, help="Project Name", shell_complete=project_completer)
@@ -677,75 +732,43 @@ def _build_token_kubeconfig(url, profile, cluster_name, ca_data):
 @click.option('--user', type=click.STRING, help="User")
 @click.option('--group', type=click.STRING, help="Group")
 @click.option('--ttl', type=click.STRING, help="TTL in human readable format (5h, 1d, 1w)")
-@click.option('--url', is_flag=True, help="Generate a kubeconfig authenticated by 'oks-cli cluster token' for the cluster API server URL")
+@click.option('--auth', type=click.Choice(["cert", "token"]), default="cert",
+              help="Authentication of the kubeconfig: cert (client certificate, default) or token ('oks-cli cluster token' exec plugin)")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, output, wide, refresh, nacl, user, group, ttl, url, profile):
+def cluster_kubeconfig_command(ctx, project_name, cluster_name, print_path, output, wide, refresh, nacl, user, group, ttl, auth, profile):
     """CLI command to fetch and optionally print the kubeconfig for a specified cluster."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
 
-    if url:
-        if print_path or output == 'table':
-            raise click.UsageError("--url supports only yaml and json output")
-        project_id = find_project_id_by_name(project_name)
-        cluster_id = find_cluster_id_by_name(project_id, cluster_name)
-        server, ca_data = _fetch_cluster_endpoint(cluster_id)
-        kubeconfig = _build_token_kubeconfig(server, os.environ["OKS_PROFILE"], cluster_name, ca_data)
-        if output == 'json':
-            click.echo(json.dumps(kubeconfig))
-        else:
-            click.echo(yaml.safe_dump(kubeconfig, sort_keys=False), nl=False)
-        return
+    if auth == "token":
+        if output == 'table':
+            raise click.UsageError("--auth token supports only yaml and json output")
+        if user or group or ttl or nacl:
+            raise click.UsageError("--user, --group, --ttl and --nacl are only supported with --auth cert")
 
     project_id = find_project_id_by_name(project_name)
     cluster_id = find_cluster_id_by_name(project_id, cluster_name)
 
-    # @TODO: check expiration in get_cache() code, etc
-    kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig', user, group)
+    if auth == "token":
+        kubeconfig_path, kubeconfig = _get_token_kubeconfig(project_id, cluster_id, cluster_name, refresh)
+    else:
+        # @TODO: check expiration in get_cache() code, etc
+        kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig', user, group)
 
-    kubeconfig = None
-    is_cert_valid = False
+        kubeconfig = None
+        is_cert_valid = False
 
-    if kubeconfig_path:
-        with open(kubeconfig_path) as f:
-            kubeconfig = f.read()
+        if kubeconfig_path:
+            with open(kubeconfig_path) as f:
+                kubeconfig = f.read()
 
-    if kubeconfig:
-        is_cert_valid = verify_certificate(kubeconfig)
+        if kubeconfig:
+            is_cert_valid = verify_certificate(kubeconfig)
 
-    if not kubeconfig_path or refresh or not is_cert_valid:
-        logging.info("extracting kubeconfig by api")
-
-        params = {}
-        if user:
-            params["user"] = user
-        if group:
-            params["group"] = group
-        if ttl:
-            params["ttl"] = ttl
-
-        if nacl:
-            ephemeral = PrivateKey.generate()
-            unsealbox = SealedBox(ephemeral)
-
-            headers = {
-              'x-encrypt-nacl': ephemeral.public_key.encode(Base64Encoder).decode('ascii')
-            }
-            kubeconfig_raw = do_request("POST", f'clusters/{cluster_id}/kubeconfig', params = params, headers = headers)['data']['kubeconfig']
-        else:
-            kubeconfig_raw = do_request("GET", f'clusters/{cluster_id}/kubeconfig', params = params)['data']['kubeconfig']
-
-        if not kubeconfig_raw:
-            logging.error("empty response")
-            raise SystemExit()
-        elif nacl:
-            logging.info("decrypting received kubeconfig")
-            kubeconfig = unsealbox.decrypt(kubeconfig_raw.encode('ascii'), encoder = Base64Encoder).decode('ascii')
-        else:
-            kubeconfig = kubeconfig_raw
-
-        kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig, user, group)
+        if not kubeconfig_path or refresh or not is_cert_valid:
+            kubeconfig = _fetch_cert_kubeconfig(cluster_id, user, group, ttl, nacl)
+            kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig, user, group)
 
     if print_path:
         click.echo(kubeconfig_path)
@@ -809,32 +832,35 @@ def cluster_token_command(ctx, url, profile):
     click.echo(json.dumps(exec_credential))
 
 
-def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=False):
+def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=False, auth="cert", cluster_name=None):
     """Run a kubectl command using the cached kubeconfig for the specified cluster, refreshing it if needed."""
-    # @TODO: check expiration in get_cache() code, etc
-    kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig', user, group)
+    if auth == "token":
+        kubeconfig_path, _ = _get_token_kubeconfig(project_id, cluster_id, cluster_name)
+    else:
+        # @TODO: check expiration in get_cache() code, etc
+        kubeconfig_path = get_cache(project_id, cluster_id, 'kubeconfig', user, group)
 
-    kubeconfig = None
-    is_cert_valid = False
+        kubeconfig = None
+        is_cert_valid = False
 
-    if kubeconfig_path :
-        with open(kubeconfig_path) as f:
-            kubeconfig = f.read()
+        if kubeconfig_path :
+            with open(kubeconfig_path) as f:
+                kubeconfig = f.read()
 
-    if kubeconfig:
-        is_cert_valid = verify_certificate(kubeconfig)
+        if kubeconfig:
+            is_cert_valid = verify_certificate(kubeconfig)
 
-    if not kubeconfig_path or not is_cert_valid:
-        logging.info("extracting kubeconfig by api")
+        if not kubeconfig_path or not is_cert_valid:
+            logging.info("extracting kubeconfig by api")
 
-        kubeconfig_raw = do_request(
-            "GET", f'clusters/{cluster_id}/kubeconfig')['data']['kubeconfig']
+            kubeconfig_raw = do_request(
+                "GET", f'clusters/{cluster_id}/kubeconfig')['data']['kubeconfig']
 
-        if not kubeconfig_raw:
-            click.echo("Cannot get kubeconfig")
-            raise SystemExit(1)
+            if not kubeconfig_raw:
+                click.echo("Cannot get kubeconfig")
+                raise SystemExit(1)
 
-        kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
+            kubeconfig_path = save_cache(project_id, cluster_id, 'kubeconfig', kubeconfig_raw, user, group)
 
     env = dict(os.environ)
     env['KUBECONFIG'] = str(kubeconfig_path)
@@ -861,18 +887,23 @@ def _run_kubectl(project_id, cluster_id, user, group, args, input=None, capture=
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--user', type=click.STRING, help="User")
 @click.option('--group', type=click.STRING, help="Group")
+@click.option('--auth', type=click.Choice(["cert", "token"]), default="cert",
+              help="Authentication of the kubeconfig: cert (client certificate, default) or token ('oks-cli cluster token' exec plugin)")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
-def cluster_kubectl_command(ctx, project_name, cluster_name, user, group, args, profile):
+def cluster_kubectl_command(ctx, project_name, cluster_name, user, group, auth, args, profile):
     """CLI command to run kubectl against a specified cluster using its kubeconfig."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
 
+    if auth == "token" and (user or group):
+        raise click.UsageError("--user and --group are only supported with --auth cert")
+
     project_id = find_project_id_by_name(project_name)
     cluster_id = find_cluster_id_by_name(project_id, cluster_name)
 
-    _run_kubectl(project_id, cluster_id, user, group, args)
+    _run_kubectl(project_id, cluster_id, user, group, args, auth=auth, cluster_name=cluster_name)
 
 
 @click.group(help="Nodepool related commands.")
