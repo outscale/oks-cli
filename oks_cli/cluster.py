@@ -911,18 +911,25 @@ def cluster_kubectl_command(ctx, project_name, cluster_name, user, group, auth, 
 @click.option('--cluster-name', '--name', '-c', required=False, help="Cluster Name", shell_complete=cluster_completer)
 @click.option('--user', type=click.STRING, help="User")
 @click.option('--group', type=click.STRING, help="Group")
+@click.option('--auth', type=click.Choice(["cert", "token"]), default="cert",
+              help="Authentication of the kubeconfig: cert (client certificate, default) or token ('oks-cli cluster token' exec plugin)")
 @click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
 @click.pass_context
-def nodepool(ctx, project_name, cluster_name, user, group, profile):
+def nodepool(ctx, project_name, cluster_name, user, group, auth, profile):
     """CLI group for nodepool-related commands, managing project, cluster, user, and profile context."""
     project_name, cluster_name, profile = ctx_update(ctx, project_name, cluster_name, profile)
     login_profile(profile)
 
+    if auth == "token" and (user or group):
+        raise click.UsageError("--user and --group are only supported with --auth cert")
+
     ctx.obj['project_id'] = find_project_id_by_name(project_name)
     ctx.obj['cluster_id'] = find_cluster_id_by_name(
         ctx.obj['project_id'], cluster_name)
+    ctx.obj['cluster_name'] = cluster_name
     ctx.obj['user'] = user
     ctx.obj['group'] = group
+    ctx.obj['auth'] = auth
 
 
 cluster.add_command(nodepool)
@@ -933,7 +940,7 @@ cluster.add_command(nodepool)
 def nodepool_list(ctx):
     """List nodepools in the specified cluster using kubectl."""
     _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'], [
-                 'get', 'nodepool', '-o', 'wide'])
+                 'get', 'nodepool', '-o', 'wide'], auth=ctx.obj['auth'], cluster_name=ctx.obj['cluster_name'])
 
 
 @nodepool.command('create', help="Create a new nodepool")
@@ -966,7 +973,7 @@ def setup_worker_pool(ctx, nodepool_name, count, vmtype, zone, output, dry_run, 
         print_output(nodepool, output)
     else:
         _run_kubectl(ctx.obj['project_id'], ctx.obj['cluster_id'], ctx.obj['user'], ctx.obj['group'], [
-                 'create', '-f', '-'], input=json.dumps(nodepool))
+                 'create', '-f', '-'], input=json.dumps(nodepool), auth=ctx.obj['auth'], cluster_name=ctx.obj['cluster_name'])
 
 
 @nodepool.command('delete')
@@ -987,5 +994,7 @@ def delete_worker_pool(ctx, nodepool_name, force):
         ctx.obj['cluster_id'],
         ctx.obj['user'],
         ctx.obj['group'],
-        ['delete', 'nodepool', nodepool_name]
+        ['delete', 'nodepool', nodepool_name],
+        auth=ctx.obj['auth'],
+        cluster_name=ctx.obj['cluster_name'],
     )
