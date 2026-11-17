@@ -16,7 +16,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Plumber
-      uses: outscale/.github/pipeline-compliance@2cbbe00ba9835f42809be7511fe7dba5a0dc0c15 # v1.0.0
+      uses: outscale/.github/pipeline-compliance@cc76c3e03f3c7a83a09914b1ed65b7fea5605fb8 # v1.5.1
       with:
         plumber-threshold: 100
         github-token: ${{ secrets.PLUMBER_TOKEN }}
