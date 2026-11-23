@@ -140,6 +140,49 @@ def test_project_get_command_output_yaml(mock_request, add_default_profile):
     assert data[0]["id"] == "12345"
 # END PROJECT GET COMMAND
 
+# START PROJECT HEALTH COMMAND
+# Test the "project health" command: verifies fetching the health status of a specific project
+@patch("oks_cli.utils.requests.request")
+def test_project_health_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Health": {"issues": ["PRJ-002: Quota exceeded for security groups"]}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "health", "-p", "test"])
+    assert result.exit_code == 0
+    assert '"PRJ-002: Quota exceeded for security groups"' in result.output
+    assert mock_request.call_args.args[1].endswith("projects/12345/health")
+    assert not mock_request.call_args.kwargs["params"]
+
+# Test the "project health" command with --acknowledged: verifies the query parameter is sent
+@patch("oks_cli.utils.requests.request")
+def test_project_health_command_acknowledged(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Health": {"issues": ["PRJ-001: Acknowledged issue"]}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "health", "-p", "test", "-a"])
+    assert result.exit_code == 0
+    assert mock_request.call_args.kwargs["params"] == {"acknowledged": "true"}
+
+# Test the "project health" command with YAML output and no issues
+@patch("oks_cli.utils.requests.request")
+def test_project_health_command_yaml(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Health": {"issues": []}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["project", "health", "-p", "test", "-o", "yaml"])
+    assert result.exit_code == 0
+    assert yaml.safe_load(result.output) == {"issues": []}
+# END PROJECT HEALTH COMMAND
+
 # START PROJECT CREATE COMMAND
 # Test the "project create" command: verifies dry-run project creation
 @patch("oks_cli.utils.requests.request")

@@ -53,6 +53,8 @@ def find_response_object(data):
             return response["Cluster"]
         elif key == "Clusters":
             return response["Clusters"]
+        elif key == "Health":
+            return response["Health"]
         elif key == "Project":
             return response["Project"]
         elif key == "Projects":

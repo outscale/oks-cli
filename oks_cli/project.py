@@ -263,6 +263,24 @@ def project_get(ctx, project_name, output, profile):
     data = do_request("GET", f'projects/{project_id}')
     print_output(data, output)
 
+# GET PROJECT HEALTH BY NAME
+@project.command('health', help="Get the health status of a project")
+@click.option('--project-name', '-p', help="Name of the project", shell_complete=project_completer)
+@click.option('--acknowledged', '-a', is_flag=True, help="Include acknowledged issues")
+@click.option('--output', '-o', type=click.Choice(["json", "yaml"]), help="Specify output format, by default is json")
+@click.option('--profile', help="Configuration profile to use", shell_complete=profile_completer)
+@click.pass_context
+def project_health_command(ctx, project_name, acknowledged, output, profile):
+    """Retrieve and display the health status of a specific project."""
+    project_name, _, profile = ctx_update(ctx, project_name, None, profile)
+    login_profile(profile)
+
+    project_id = find_project_id_by_name(project_name)
+
+    params = {"acknowledged": "true"} if acknowledged else {}
+    data = do_request("GET", f'projects/{project_id}/health', params=params)
+    print_output(data, output)
+
 # DELETE PROJECT BY NAME
 @project.command('delete', help="Delete a project by name")
 @click.option('--project-name', '-p', required=False, help="Project Name", type=click.STRING, shell_complete=project_completer)

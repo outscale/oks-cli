@@ -162,6 +162,61 @@ def test_cluster_get_yaml(mock_request, add_default_profile):
     assert data["name"] == "test"
 
 
+# Test the "cluster health" command: verifies fetching the health status of a specific cluster
+@patch("oks_cli.utils.requests.request")
+def test_cluster_health_command(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Health": {"issues": ["NPL-001: Unable to create VM"], "info": {"cluster_version": "v1.35.0"}}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "health", "-p", "test", "-c", "test"])
+    assert result.exit_code == 0
+    assert '"NPL-001: Unable to create VM"' in result.output
+    assert '"cluster_version": "v1.35.0"' in result.output
+    assert not mock_request.call_args.kwargs["params"]
+
+# Test the "cluster health" command with --acknowledged: verifies the query parameter is sent
+@patch("oks_cli.utils.requests.request")
+def test_cluster_health_command_acknowledged(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Health": {"issues": ["OKS-NPL-002: Maintenance postponed by user"], "info": {}}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "health", "-p", "test", "-c", "test", "--acknowledged"])
+    assert result.exit_code == 0
+    assert mock_request.call_args.kwargs["params"] == {"acknowledged": "true"}
+    assert "OKS-NPL-002" in result.output
+
+# Test the "cluster health" command with YAML output
+@patch("oks_cli.utils.requests.request")
+def test_cluster_health_command_yaml(mock_request, add_default_profile):
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers={}, json=lambda: {"ResponseContext": {}, "Health": {"issues": [], "info": {}}}),
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "cluster", "health",
+        "-p", "test",
+        "-c", "test",
+        "-o", "yaml",
+        "--profile", "default"
+    ])
+
+    assert result.exit_code == 0
+
+    output = yaml.safe_load(result.output)
+    assert output["issues"] == []
+    assert output["info"] == {}
+
 # Test the "cluster create" command: verifies creating a new cluster in a project
 @patch("oks_cli.utils.requests.request")
 def test_cluster_create_command(mock_request, add_default_profile):

@@ -91,6 +91,7 @@ oks-cli fullhelp
 | project list                         | List all projects                                             |
 | project create                       | Create a new project                                          |
 | project get                          | Get default project or the project by name                    |
+| project health                       | Get the health status of a project                            |
 | project update                       | Update a project by name                                      |
 | project delete                       | Delete a project by name                                      |
 | project login                        | Set a default project by name                                 |
@@ -101,6 +102,7 @@ oks-cli fullhelp
 | cluster list                         | List all clusters                                             |
 | cluster create                       | Create a new cluster                                          |
 | cluster get                          | Get a cluster by name                                         |
+| cluster health                       | Get the health status of a cluster                            |
 | cluster update                       | Update a cluster by name                                      |
 | cluster upgrade                      | Upgrade a cluster by name                                     |
 | cluster delete                       | Delete a cluster by name                                      |
