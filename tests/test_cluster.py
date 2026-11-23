@@ -350,6 +350,69 @@ def test_cluster_kubeconfig_command(mock_request, add_default_profile):
     assert result.exit_code == 0
     assert 'kubeconfig' in result.output
 
+# Test the "cluster kubeconfig --auth token" command: server and CA come from a 1 second kubeconfig, credentials from "cluster token"
+@patch("oks_cli.utils.requests.request")
+def test_cluster_kubeconfig_auth_token_command(mock_request, add_default_profile):
+    issued = yaml.safe_dump({
+        "clusters": [{"name": "test", "cluster": {"server": "https://kube.example:6443", "certificate-authority-data": "Q0E="}}],
+        "contexts": [{"name": "test", "context": {"cluster": "test", "user": "admin"}}],
+        "current-context": "test",
+    })
+    mock_request.side_effect = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": issued}}})
+    ]
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "kubeconfig", "-p", "test", "-c", "test", "--auth", "token", "-o", "json"])
+    assert result.exit_code == 0, result.output
+
+    assert mock_request.call_args.kwargs["params"] == {"ttl": "1s"}
+    kubeconfig = json.loads(result.output)
+    assert kubeconfig["clusters"][0]["cluster"] == {"server": "https://kube.example:6443", "certificate-authority-data": "Q0E="}
+    assert kubeconfig["users"][0]["user"]["exec"]["args"] == ["cluster", "token", "--url", "https://kube.example:6443"]
+
+# Test the "cluster kubeconfig --auth token" command: the generated kubeconfig is cached until --refresh
+@patch("oks_cli.utils.requests.request")
+def test_cluster_kubeconfig_auth_token_is_cached(mock_request, add_default_profile):
+    issued = yaml.safe_dump({
+        "clusters": [{"name": "test", "cluster": {"server": "https://kube.example:6443", "certificate-authority-data": "Q0E="}}],
+    })
+    lookups = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+    ]
+    issue = MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": issued}}})
+    mock_request.side_effect = lookups + [issue] + lookups + lookups + [issue]
+
+    runner = CliRunner()
+    command = ["cluster", "kubeconfig", "-p", "test", "-c", "test", "--auth", "token"]
+
+    first = runner.invoke(cli, command + ["--print-path"])
+    assert first.exit_code == 0, first.output
+    assert first.output.strip().endswith("kubeconfig-token")
+    assert mock_request.call_count == 3
+
+    second = runner.invoke(cli, command)
+    assert second.exit_code == 0, second.output
+    assert mock_request.call_count == 5
+    with open(first.output.strip()) as f:
+        assert second.output.strip() == f.read().strip()
+
+    refreshed = runner.invoke(cli, command + ["--refresh"])
+    assert refreshed.exit_code == 0, refreshed.output
+    assert mock_request.call_count == 8
+
+# Test the "cluster kubeconfig --auth token" command: client certificate options are rejected
+@patch("oks_cli.utils.requests.request")
+def test_cluster_kubeconfig_auth_token_rejects_cert_options(mock_request, add_default_profile):
+    runner = CliRunner()
+    result = runner.invoke(cli, ["cluster", "kubeconfig", "-p", "test", "-c", "test", "--auth", "token", "--ttl", "1d"])
+    assert result.exit_code != 0
+    assert "only supported with --auth cert" in result.output
+    mock_request.assert_not_called()
+
 # Test the "cluster kubeconfig --output table" command: verifies retrieving the kubeconfig and output as table
 @patch("oks_cli.utils.requests.request")
 def test_cluster_kubeconfig_info_command(mock_request, add_default_profile):
@@ -434,6 +497,33 @@ def test_cluster_kubectl_command(mock_request, mock_run, add_default_profile):
     assert result.exit_code == 0
     assert ".oks_cli/cache/12345-12345/default/default/kubeconfig" in kwargs["env"]["KUBECONFIG"]
     assert args[0] == ["kubectl", "get", "pods"]
+
+# Test the "cluster kubectl --auth token" command: kubectl runs with the cached token kubeconfig
+@patch("oks_cli.utils.subprocess.run")
+@patch("oks_cli.utils.requests.request")
+def test_cluster_kubectl_auth_token_command(mock_request, mock_run, add_default_profile):
+    issued = yaml.safe_dump({
+        "clusters": [{"name": "test", "cluster": {"server": "https://kube.example:6443", "certificate-authority-data": "Q0E="}}],
+    })
+    lookups = [
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Projects": [{"id": "12345"}]}),
+        MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Clusters": [{"id": "12345"}]}),
+    ]
+    issue = MagicMock(status_code=200, headers = {}, json=lambda: {"ResponseContext": {}, "Cluster":  {"data": {"kubeconfig": issued}}})
+    mock_request.side_effect = lookups + [issue] + lookups
+    mock_run.return_value = MagicMock(returncode = 0, stdout = "Success", stderr = "")
+
+    runner = CliRunner()
+    for _ in range(2):
+        result = runner.invoke(cli, ["cluster", "-p", "test", "-c", "test", "kubectl", "--auth", "token", "get", "pods"])
+        assert result.exit_code == 0, result.output
+
+    assert mock_request.call_count == 5
+    args, kwargs = mock_run.call_args
+    assert kwargs["env"]["KUBECONFIG"].endswith(".oks_cli/cache/12345-12345/default/default/kubeconfig-token")
+    assert args[0] == ["kubectl", "get", "pods"]
+    with open(kwargs["env"]["KUBECONFIG"]) as f:
+        assert yaml.safe_load(f)["users"][0]["user"]["exec"]["args"] == ["cluster", "token", "--url", "https://kube.example:6443"]
 
 # Test the "cluster create by one-click" command: verifies creating cluster interactively
 @patch("oks_cli.utils.os.fork")

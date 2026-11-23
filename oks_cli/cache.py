@@ -1,5 +1,5 @@
 import click
-from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_expiration_date, \
+from .utils import clear_cache, find_project_id_by_name, find_cluster_id_by_name, get_all_cache, get_cache, get_expiration_date, \
                    ctx_update, login_profile, profile_completer, cluster_completer, project_completer, print_table
 
 from prettytable import TableStyle
@@ -39,7 +39,7 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
     result = get_all_cache(project_id, cluster_id, "kubeconfig")
 
     data = []
-    fields = [["user", "user"],["group", "group"], ["expiration date", "expires_at"]]
+    fields = [["user", "user"],["group", "group"], ["auth", "auth"], ["expiration date", "expires_at"]]
 
     for element in result:
         kubeconfig = None
@@ -52,8 +52,11 @@ def list_kubeconfigs(ctx, project_name, cluster_name, plain, msword, profile):
 
         if kubeconfig:
             exp = get_expiration_date(kubeconfig)
-            row = user, group, exp
-            data.append({"user": user, "group": group, "expires_at": exp})
+            data.append({"user": user, "group": group, "auth": "cert", "expires_at": exp})
+
+    # the token kubeconfig runs `oks-cli cluster token`, it has no certificate user/group and does not expire
+    if get_cache(project_id, cluster_id, "kubeconfig-token", None, None):
+        data.append({"user": "-", "group": "-", "auth": "token", "expires_at": "never"})
 
     style = None
     if plain:
