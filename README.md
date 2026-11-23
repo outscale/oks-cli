@@ -24,7 +24,6 @@
 * [Installation](#-installation)
 
   * [Standard Installation](#standard-installation)
-  * [User Installation](#user-installation)
 * [Usage](#-usage)
 
   * [Commands](#commands)
