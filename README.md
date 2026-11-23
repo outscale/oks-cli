@@ -91,6 +91,7 @@ oks-cli fullhelp
 | project list                         | List all projects                                             |
 | project create                       | Create a new project                                          |
 | project get                          | Get default project or the project by name                    |
+| project health                       | Get the health status of a project                            |
 | project update                       | Update a project by name                                      |
 | project delete                       | Delete a project by name                                      |
 | project login                        | Set a default project by name                                 |
