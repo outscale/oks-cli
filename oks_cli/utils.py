@@ -18,6 +18,8 @@ import dateutil.parser
 import human_readable
 import base64
 import sys
+import functools
+import importlib.metadata
 
 from click.shell_completion import CompletionItem
 
@@ -144,11 +146,21 @@ def do_request(method, path, *args, **kwargs):
             errors = {"Error": f"Failed to reach the endpoint {url} ({err.__class__.__name__})"}
             raise JSONClickException(json.dumps(errors))
 
+@functools.lru_cache(maxsize=None)
+def get_user_agent():
+    """Return the User-Agent identifying oks-cli and its installed version."""
+    try:
+        version = importlib.metadata.version("oks-cli")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    return f"oks-cli/{version}"
+
 def build_headers():
     """Build HTTP headers for API requests based on environment authentication settings."""
     headers = {
         "Content-Type": "application/json",
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "User-Agent": get_user_agent()
     }
 
     if os.getenv("OKS_OTP_CODE"):
